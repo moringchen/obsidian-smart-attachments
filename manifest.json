@@ -3,7 +3,7 @@
 	"name": "Smart Attachments",
 	"version": "1.0.0",
 	"minAppVersion": "0.15.0",
-	"description": "Automatically organize attachments to a resources folder with the same relative structure as your markdown files",
+	"description": "Automatically organize attachments to a resources folder with the same relative structure as your markdown files.",
 	"author": "moringchen",
 	"authorUrl": "https://github.com/moringchen",
 	"fundingUrl": "",
