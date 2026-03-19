@@ -1,0 +1,67 @@
+# Smart Attachments Plugin - Progress Log
+
+## Iteration 1 - Complete
+
+### Completed Stories
+- US-001: Project initialization ✓
+- US-002: Paste event handling ✓
+- US-003: Drop event handling ✓
+- US-004: Settings UI ✓
+- US-005: Build and verification ✓
+
+### Files Created
+```
+obsidian-smart-attachments/
+├── manifest.json           # Plugin manifest
+├── package.json            # NPM dependencies
+├── tsconfig.json           # TypeScript config
+├── esbuild.config.mjs      # Build configuration
+├── versions.json           # Version compatibility
+├── README.md               # Documentation
+├── main.js                 # Built plugin (17KB)
+└── src/
+    ├── main.ts             # Plugin entry point
+    ├── settings.ts         # Settings exports
+    ├── settings-tab.ts     # Settings UI
+    ├── types.ts            # Type definitions
+    ├── handlers/
+    │   ├── paste-handler.ts    # Clipboard paste handling
+    │   └── drop-handler.ts     # Drag & drop handling
+    └── utils/
+        ├── path-utils.ts       # Path calculation utilities
+        └── link-utils.ts       # Link format utilities
+```
+
+### Key Implementation Details
+
+1. **Resource Path Structure**
+   - Desktop: Uses FileSystemAdapter.getBasePath() to get vault root
+   - Mobile: Falls back to vault-internal storage
+   - Resources stored at: {vault-parent}/resources/{type}/{md-relative-path}/
+
+2. **File Type Organization**
+   - images: jpg, jpeg, png, gif, webp, svg, bmp, ico
+   - audio: mp3, wav, ogg, flac, m4a
+   - videos: mp4, webm, mov, avi, mkv
+   - documents: pdf, doc, docx, xls, xlsx, ppt, pptx
+   - archives: zip, rar, 7z, tar, gz
+   - code: js, ts, py, java, cpp, c, go, rs, html, css, json, xml, yaml, yml, sql, sh, bat, ps1
+   - files: all others
+
+3. **Duplicate Handling**
+   - Automatically appends numeric suffix
+   - Example: image.png → image-1.png → image-2.png
+
+4. **Link Formats Supported**
+   - WikiLinks: ![[resources/images/path/file.png]]
+   - Markdown: ![alt](resources/images/path/file.png)
+
+### Build Status
+- TypeScript compilation: ✓ PASS
+- ESBuild bundling: ✓ PASS
+- Output: main.js (17,306 bytes)
+
+### Next Steps (if needed)
+- Manual testing in Obsidian
+- Publishing to community plugin registry
+- Adding automated tests

@@ -1,0 +1,76 @@
+{
+  "title": "Obsidian 智能附件管理插件",
+  "version": "1.0.0",
+  "stories": [
+    {
+      "id": "US-001",
+      "title": "Phase 1: 项目初始化 - 创建插件基础结构",
+      "description": "创建 Obsidian 插件的基础文件结构，包括 manifest.json, package.json, tsconfig.json, esbuild.config.mjs 和主入口文件",
+      "priority": 1,
+      "passes": true,
+      "acceptanceCriteria": [
+        "manifest.json 包含正确的插件信息 (id, name, version, minAppVersion)",
+        "package.json 配置完整的依赖 (obsidian API, TypeScript, esbuild)",
+        "tsconfig.json 配置正确的 TypeScript 编译选项",
+        "esbuild.config.mjs 配置正确的构建流程",
+        "src/main.ts 存在并导出默认插件类",
+        "npm install 成功执行无错误"
+      ]
+    },
+    {
+      "id": "US-002",
+      "title": "Phase 2: 核心功能 - 粘贴事件处理",
+      "description": "实现从剪贴板粘贴图片/文件的处理逻辑，包括读取剪贴板数据、保存文件到资源目录、在 Markdown 中插入链接",
+      "priority": 2,
+      "passes": true,
+      "acceptanceCriteria": [
+        "粘贴事件监听器正确注册在 editor 上",
+        "从剪贴板读取文件数据 (ClipboardEvent.files 或 ClipboardItem)",
+        "文件被保存到 resources/{file-type}/{md-relative-path}/ 目录",
+        "Markdown 中自动插入正确的 WikiLinks 格式: ![[resources/images/path/file.png]]",
+        "重复文件名自动添加数字后缀 (file.png → file-1.png → file-2.png)",
+        "支持图片类型: jpg, jpeg, png, gif, webp, svg"
+      ]
+    },
+    {
+      "id": "US-003",
+      "title": "Phase 2: 核心功能 - 拖拽事件处理",
+      "description": "实现从本地文件系统拖拽文件到 Obsidian 的处理逻辑",
+      "priority": 3,
+      "passes": true,
+      "acceptanceCriteria": [
+        "拖拽事件监听器正确注册",
+        "从拖拽事件中读取文件 (DataTransfer.files)",
+        "本地文件被正确复制到资源目录",
+        "链接格式与粘贴事件一致"
+      ]
+    },
+    {
+      "id": "US-004",
+      "title": "Phase 3: 设置界面 - 插件配置",
+      "description": "创建设置界面，允许用户配置资源目录名称、链接格式等选项",
+      "priority": 4,
+      "passes": true,
+      "acceptanceCriteria": [
+        "设置界面在 Obsidian 设置中可见",
+        "可配置资源目录名称 (默认: resources)",
+        "可配置链接格式 (WikiLinks / Standard Markdown)",
+        "设置变更后实时生效",
+        "设置持久化到 data.json"
+      ]
+    },
+    {
+      "id": "US-005",
+      "title": "Phase 4: 优化与验证 - 构建和测试",
+      "description": "完成构建配置，运行测试，确保插件可以正确编译和运行",
+      "priority": 5,
+      "passes": true,
+      "acceptanceCriteria": [
+        "npm run build 成功生成 main.js",
+        "TypeScript 编译无错误",
+        "插件可以加载到 Obsidian 中",
+        "README.md 包含安装和使用说明"
+      ]
+    }
+  ]
+}
