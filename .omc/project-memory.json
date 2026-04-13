@@ -1,0 +1,94 @@
+{
+  "version": "1.0.0",
+  "lastScanned": 1776048364315,
+  "projectRoot": "/Users/moringchen/workspace/ai/obsidian",
+  "techStack": {
+    "languages": [
+      {
+        "name": "JavaScript/TypeScript",
+        "version": null,
+        "confidence": "high",
+        "markers": [
+          "package.json"
+        ]
+      },
+      {
+        "name": "TypeScript",
+        "version": null,
+        "confidence": "high",
+        "markers": [
+          "tsconfig.json"
+        ]
+      }
+    ],
+    "frameworks": [
+      {
+        "name": "esbuild",
+        "version": "0.17.3",
+        "category": "build"
+      }
+    ],
+    "packageManager": "npm",
+    "runtime": null
+  },
+  "build": {
+    "buildCommand": "npm run build",
+    "testCommand": null,
+    "lintCommand": null,
+    "devCommand": "npm run dev",
+    "scripts": {
+      "dev": "node esbuild.config.mjs",
+      "build": "tsc -noEmit -skipLibCheck && node esbuild.config.mjs production",
+      "version": "node version-bump.mjs && git add manifest.json versions.json"
+    }
+  },
+  "conventions": {
+    "namingStyle": "camelCase/PascalCase",
+    "importStyle": "ES modules",
+    "testPattern": null,
+    "fileOrganization": null
+  },
+  "structure": {
+    "isMonorepo": false,
+    "workspaces": [],
+    "mainDirectories": [
+      "src"
+    ],
+    "gitBranches": null
+  },
+  "customNotes": [],
+  "directoryMap": {
+    "src": {
+      "path": "src",
+      "purpose": "Source code",
+      "fileCount": 4,
+      "lastAccessed": 1776048363933,
+      "keyFiles": [
+        "main.ts",
+        "settings-tab.ts",
+        "settings.ts",
+        "types.ts"
+      ]
+    },
+    "src/utils": {
+      "path": "src/utils",
+      "purpose": "Utility functions",
+      "fileCount": 3,
+      "lastAccessed": 1776048363934,
+      "keyFiles": [
+        "cleanup-utils.ts",
+        "link-utils.ts",
+        "path-utils.ts"
+      ]
+    }
+  },
+  "hotPaths": [
+    {
+      "path": "manifest.json",
+      "accessCount": 1,
+      "lastAccessed": 1776048664741,
+      "type": "file"
+    }
+  ],
+  "userDirectives": []
+}

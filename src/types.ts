@@ -11,6 +11,8 @@ export interface SmartAttachmentsSettings {
     autoRenameDuplicates: boolean;
     imageSubFolder: string;
     otherFilesSubFolder: string;
+    autoCleanupOnExit: boolean;
+    showCleanupConfirmation: boolean;
 }
 
 export const DEFAULT_SETTINGS: SmartAttachmentsSettings = {
@@ -18,7 +20,9 @@ export const DEFAULT_SETTINGS: SmartAttachmentsSettings = {
     linkFormat: LinkFormat.WIKILINK,
     autoRenameDuplicates: true,
     imageSubFolder: 'images',
-    otherFilesSubFolder: 'files'
+    otherFilesSubFolder: 'files',
+    autoCleanupOnExit: false,
+    showCleanupConfirmation: true
 };
 
 export interface FileTypeConfig {

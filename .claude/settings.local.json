@@ -4,7 +4,22 @@
       "Bash(npm install:*)",
       "Bash(ls:*)",
       "Bash(npm run:*)",
-      "mcp__plugin_oh-my-claudecode_t__state_clear"
+      "mcp__plugin_oh-my-claudecode_t__state_clear",
+      "Bash(git commit:*)",
+      "Bash(git push:*)",
+      "Bash(git remote:*)",
+      "Bash(ssh:*)",
+      "Bash(ssh-add ~/.ssh/id_rsa)",
+      "Bash(eval '$\\(ssh-agent -s\\)')",
+      "Bash(SSH_ASKPASS=/bin/echo GIT_ASKPASS=/bin/echo ssh -o PreferredAuthentications=publickey -T git@github.com)",
+      "Bash(git config:*)",
+      "WebFetch(domain:github.com)",
+      "Bash(git clone:*)",
+      "Bash(node:*)",
+      "Bash(npx skills:*)",
+      "Skill(swing-trace)",
+      "Bash(gh release:*)",
+      "Bash(git add:*)"
     ]
   }
 }

@@ -27,7 +27,7 @@ __export(main_exports, {
   default: () => SmartAttachmentsPlugin
 });
 module.exports = __toCommonJS(main_exports);
-var import_obsidian5 = require("obsidian");
+var import_obsidian6 = require("obsidian");
 
 // src/types.ts
 var DEFAULT_SETTINGS = {
@@ -35,7 +35,9 @@ var DEFAULT_SETTINGS = {
   linkFormat: "wikilink" /* WIKILINK */,
   autoRenameDuplicates: true,
   imageSubFolder: "images",
-  otherFilesSubFolder: "files"
+  otherFilesSubFolder: "files",
+  autoCleanupOnExit: false,
+  showCleanupConfirmation: true
 };
 var FILE_TYPE_MAP = {
   // Images
@@ -116,6 +118,14 @@ var SmartAttachmentsSettingTab = class extends import_obsidian.PluginSettingTab 
     new import_obsidian.Setting(containerEl).setName("Auto-rename duplicates").setDesc("When a file with the same name exists, automatically rename it (e.g., image.png \u2192 image-1.png)").addToggle((toggle) => toggle.setValue(this.plugin.settings.autoRenameDuplicates).onChange(async (value) => {
       this.plugin.settings.autoRenameDuplicates = value;
       await this.plugin.saveSettings();
+    }));
+    containerEl.createEl("h3", { text: "Cleanup" });
+    new import_obsidian.Setting(containerEl).setName("Show cleanup confirmation").setDesc("Show a confirmation dialog before deleting orphaned attachments").addToggle((toggle) => toggle.setValue(this.plugin.settings.showCleanupConfirmation).onChange(async (value) => {
+      this.plugin.settings.showCleanupConfirmation = value;
+      await this.plugin.saveSettings();
+    }));
+    new import_obsidian.Setting(containerEl).setName("Clean up orphaned attachments").setDesc("Scan and delete attachment files that are not referenced in any markdown file").addButton((button) => button.setButtonText("Clean up now").setCta().onClick(() => {
+      this.plugin.cleanupOrphanedAttachments();
     }));
     containerEl.createEl("h3", { text: "How it works" });
     const infoDiv = containerEl.createDiv();
@@ -483,8 +493,232 @@ var DropHandler = class {
   }
 };
 
+// src/utils/cleanup-utils.ts
+var import_obsidian5 = require("obsidian");
+var CleanupUtils = class {
+  constructor(vault, settings) {
+    this.vault = vault;
+    this.settings = settings;
+  }
+  /**
+   * Scan for orphaned attachment files
+   */
+  async scanOrphanedFiles() {
+    const orphanedFiles = [];
+    const markdownFiles = this.vault.getMarkdownFiles();
+    const referencedFiles = await this.getAllReferencedFiles(markdownFiles);
+    const resourceFiles = await this.getAllResourceFiles();
+    for (const resourceFile of resourceFiles) {
+      if (!referencedFiles.has(resourceFile)) {
+        const stat = await this.vault.adapter.stat(resourceFile);
+        if (stat) {
+          orphanedFiles.push({
+            path: resourceFile,
+            name: resourceFile.split("/").pop() || resourceFile,
+            size: stat.size,
+            lastModified: stat.ctime
+          });
+        }
+      }
+    }
+    const totalSize = orphanedFiles.reduce((sum, f) => sum + f.size, 0);
+    return {
+      orphanedFiles,
+      totalSize,
+      deletedCount: 0,
+      deletedSize: 0
+    };
+  }
+  /**
+   * Delete orphaned files
+   */
+  async deleteOrphanedFiles(files) {
+    let deletedCount = 0;
+    let deletedSize = 0;
+    for (const file of files) {
+      try {
+        await this.vault.adapter.remove(file.path);
+        deletedCount++;
+        deletedSize += file.size;
+      } catch (error) {
+        console.error(`Failed to delete ${file.path}:`, error);
+      }
+    }
+    return { deletedCount, deletedSize };
+  }
+  /**
+   * Get all resource files in the resources directory
+   */
+  async getAllResourceFiles() {
+    const resourceFiles = [];
+    const vaultRoot = this.getVaultRoot();
+    const resourceDir = `${vaultRoot}/../${this.settings.resourceFolderName}`;
+    try {
+      await this.collectFilesRecursive(resourceDir, resourceFiles);
+    } catch (error) {
+      console.log("Resource directory not found or empty:", error);
+    }
+    return resourceFiles;
+  }
+  /**
+   * Recursively collect files from directory
+   */
+  async collectFilesRecursive(dir, files) {
+    try {
+      const list = await this.vault.adapter.list(dir);
+      for (const file of list.files) {
+        files.push(file);
+      }
+      for (const folder of list.folders) {
+        await this.collectFilesRecursive(folder, files);
+      }
+    } catch (error) {
+    }
+  }
+  /**
+   * Get all files referenced in markdown files
+   */
+  async getAllReferencedFiles(markdownFiles) {
+    const referencedFiles = /* @__PURE__ */ new Set();
+    for (const mdFile of markdownFiles) {
+      const content = await this.vault.cachedRead(mdFile);
+      const wikiLinkRegex = /!?\[\[(resources\/[^\]]+)\]\]/g;
+      let match;
+      while ((match = wikiLinkRegex.exec(content)) !== null) {
+        const resourcePath = match[1];
+        const fullPath = this.resolveResourcePath(resourcePath);
+        if (fullPath) {
+          referencedFiles.add(fullPath);
+        }
+      }
+      const markdownLinkRegex = /!?\[[^\]]*\]\((resources\/[^)]+)\)/g;
+      while ((match = markdownLinkRegex.exec(content)) !== null) {
+        const resourcePath = match[1];
+        const fullPath = this.resolveResourcePath(resourcePath);
+        if (fullPath) {
+          referencedFiles.add(fullPath);
+        }
+      }
+    }
+    return referencedFiles;
+  }
+  /**
+   * Get vault root path
+   */
+  getVaultRoot() {
+    if (this.vault.adapter instanceof import_obsidian5.FileSystemAdapter) {
+      return this.vault.adapter.getBasePath();
+    }
+    return "";
+  }
+  /**
+   * Resolve resource path to full file system path
+   */
+  resolveResourcePath(resourcePath) {
+    const vaultRoot = this.getVaultRoot();
+    const fullPath = `${vaultRoot}/../${resourcePath}`;
+    return fullPath;
+  }
+  /**
+   * Format file size for display
+   */
+  static formatFileSize(bytes) {
+    if (bytes < 1024)
+      return `${bytes} B`;
+    if (bytes < 1024 * 1024)
+      return `${(bytes / 1024).toFixed(1)} KB`;
+    if (bytes < 1024 * 1024 * 1024)
+      return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+    return `${(bytes / (1024 * 1024 * 1024)).toFixed(1)} GB`;
+  }
+};
+var CleanupConfirmModal = class extends import_obsidian5.Modal {
+  constructor(app, orphanedFiles, totalSize, onConfirm) {
+    super(app);
+    this.orphanedFiles = orphanedFiles;
+    this.totalSize = totalSize;
+    this.onConfirm = onConfirm;
+    this.result = false;
+  }
+  onOpen() {
+    const { contentEl } = this;
+    contentEl.createEl("h2", { text: "\u6E05\u7406\u5B64\u7ACB\u9644\u4EF6" });
+    contentEl.createEl("p", {
+      text: `\u53D1\u73B0 ${this.orphanedFiles.length} \u4E2A\u672A\u88AB\u5F15\u7528\u7684\u9644\u4EF6\u6587\u4EF6\uFF0C\u5360\u7528\u7A7A\u95F4 ${CleanupUtils.formatFileSize(this.totalSize)}\u3002`
+    });
+    const listContainer = contentEl.createDiv();
+    listContainer.style.maxHeight = "300px";
+    listContainer.style.overflow = "auto";
+    listContainer.style.border = "1px solid var(--background-modifier-border)";
+    listContainer.style.padding = "10px";
+    listContainer.style.marginBottom = "20px";
+    for (const file of this.orphanedFiles) {
+      const item = listContainer.createDiv();
+      item.style.marginBottom = "5px";
+      item.style.fontSize = "12px";
+      item.createSpan({
+        text: `${file.name} (${CleanupUtils.formatFileSize(file.size)})`,
+        cls: "cleanup-file-item"
+      });
+    }
+    contentEl.createEl("p", {
+      text: "\u26A0\uFE0F \u8FD9\u4E9B\u6587\u4EF6\u5728\u60A8\u7684\u7B14\u8BB0\u4E2D\u672A\u88AB\u5F15\u7528\u3002\u5220\u9664\u540E\u5C06\u65E0\u6CD5\u6062\u590D\u3002",
+      cls: "cleanup-warning"
+    });
+    const buttonContainer = contentEl.createDiv();
+    buttonContainer.style.display = "flex";
+    buttonContainer.style.justifyContent = "flex-end";
+    buttonContainer.style.gap = "10px";
+    buttonContainer.style.marginTop = "20px";
+    const cancelButton = buttonContainer.createEl("button", { text: "\u53D6\u6D88" });
+    cancelButton.addEventListener("click", () => {
+      this.close();
+    });
+    const confirmButton = buttonContainer.createEl("button", {
+      text: `\u5220\u9664 ${this.orphanedFiles.length} \u4E2A\u6587\u4EF6`,
+      cls: "mod-warning"
+    });
+    confirmButton.style.backgroundColor = "var(--background-modifier-error)";
+    confirmButton.addEventListener("click", () => {
+      this.result = true;
+      this.onConfirm();
+      this.close();
+    });
+  }
+  onClose() {
+    const { contentEl } = this;
+    contentEl.empty();
+  }
+};
+var CleanupResultModal = class extends import_obsidian5.Modal {
+  constructor(app, result) {
+    super(app);
+    this.result = result;
+  }
+  onOpen() {
+    const { contentEl } = this;
+    contentEl.createEl("h2", { text: "\u6E05\u7406\u5B8C\u6210" });
+    if (this.result.deletedCount === 0) {
+      contentEl.createEl("p", { text: "\u6CA1\u6709\u6587\u4EF6\u88AB\u5220\u9664\u3002" });
+    } else {
+      contentEl.createEl("p", {
+        text: `\u6210\u529F\u5220\u9664 ${this.result.deletedCount} \u4E2A\u6587\u4EF6\uFF0C\u91CA\u653E ${CleanupUtils.formatFileSize(this.result.deletedSize)} \u7A7A\u95F4\u3002`
+      });
+    }
+    const okButton = contentEl.createEl("button", { text: "\u786E\u5B9A", cls: "mod-cta" });
+    okButton.style.marginTop = "20px";
+    okButton.addEventListener("click", () => {
+      this.close();
+    });
+  }
+  onClose() {
+    const { contentEl } = this;
+    contentEl.empty();
+  }
+};
+
 // src/main.ts
-var SmartAttachmentsPlugin = class extends import_obsidian5.Plugin {
+var SmartAttachmentsPlugin = class extends import_obsidian6.Plugin {
   async onload() {
     await this.loadSettings();
     this.pasteHandler = new PasteHandler(this.app.vault, this.settings);
@@ -499,6 +733,13 @@ var SmartAttachmentsPlugin = class extends import_obsidian5.Plugin {
         this.handleDrop(evt, editor, view);
       })
     );
+    this.addCommand({
+      id: "cleanup-orphaned-attachments",
+      name: "\u6E05\u7406\u5B64\u7ACB\u9644\u4EF6",
+      callback: () => {
+        this.cleanupOrphanedAttachments();
+      }
+    });
     this.addSettingTab(new SmartAttachmentsSettingTab(this.app, this));
     console.log("Smart Attachments plugin loaded");
   }
@@ -543,6 +784,52 @@ var SmartAttachmentsPlugin = class extends import_obsidian5.Plugin {
     const handled = await this.dropHandler.handle(evt, editor, mdFile);
     if (handled) {
       return;
+    }
+  }
+  /**
+   * Clean up orphaned attachment files
+   */
+  async cleanupOrphanedAttachments() {
+    const cleanupUtils = new CleanupUtils(this.app.vault, this.settings);
+    new import_obsidian6.Notice("\u6B63\u5728\u626B\u63CF\u5B64\u7ACB\u9644\u4EF6...", 3e3);
+    try {
+      const result = await cleanupUtils.scanOrphanedFiles();
+      if (result.orphanedFiles.length === 0) {
+        new import_obsidian6.Notice("\u6CA1\u6709\u53D1\u73B0\u5B64\u7ACB\u9644\u4EF6\uFF01", 3e3);
+        return;
+      }
+      if (this.settings.showCleanupConfirmation) {
+        new CleanupConfirmModal(
+          this.app,
+          result.orphanedFiles,
+          result.totalSize,
+          async () => {
+            const deleteResult = await cleanupUtils.deleteOrphanedFiles(result.orphanedFiles);
+            new CleanupResultModal(this.app, {
+              ...result,
+              deletedCount: deleteResult.deletedCount,
+              deletedSize: deleteResult.deletedSize
+            }).open();
+            if (deleteResult.deletedCount > 0) {
+              new import_obsidian6.Notice(
+                `\u5DF2\u6E05\u7406 ${deleteResult.deletedCount} \u4E2A\u5B64\u7ACB\u9644\u4EF6\uFF0C\u91CA\u653E ${CleanupUtils.formatFileSize(deleteResult.deletedSize)}`,
+                5e3
+              );
+            }
+          }
+        ).open();
+      } else {
+        const deleteResult = await cleanupUtils.deleteOrphanedFiles(result.orphanedFiles);
+        if (deleteResult.deletedCount > 0) {
+          new import_obsidian6.Notice(
+            `\u5DF2\u81EA\u52A8\u6E05\u7406 ${deleteResult.deletedCount} \u4E2A\u5B64\u7ACB\u9644\u4EF6\uFF0C\u91CA\u653E ${CleanupUtils.formatFileSize(deleteResult.deletedSize)}`,
+            5e3
+          );
+        }
+      }
+    } catch (error) {
+      console.error("Error cleaning up orphaned attachments:", error);
+      new import_obsidian6.Notice("\u6E05\u7406\u5931\u8D25: " + error.message, 5e3);
     }
   }
 };

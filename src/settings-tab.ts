@@ -53,6 +53,31 @@ export class SmartAttachmentsSettingTab extends PluginSettingTab {
                     await this.plugin.saveSettings();
                 }));
 
+        // Cleanup section
+        containerEl.createEl('h3', { text: 'Cleanup' });
+
+        // Show cleanup confirmation setting
+        new Setting(containerEl)
+            .setName('Show cleanup confirmation')
+            .setDesc('Show a confirmation dialog before deleting orphaned attachments')
+            .addToggle(toggle => toggle
+                .setValue(this.plugin.settings.showCleanupConfirmation)
+                .onChange(async (value) => {
+                    this.plugin.settings.showCleanupConfirmation = value;
+                    await this.plugin.saveSettings();
+                }));
+
+        // Manual cleanup button
+        new Setting(containerEl)
+            .setName('Clean up orphaned attachments')
+            .setDesc('Scan and delete attachment files that are not referenced in any markdown file')
+            .addButton(button => button
+                .setButtonText('Clean up now')
+                .setCta()
+                .onClick(() => {
+                    this.plugin.cleanupOrphanedAttachments();
+                }));
+
         // Information section
         containerEl.createEl('h3', { text: 'How it works' });
 

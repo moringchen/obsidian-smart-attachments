@@ -1,8 +1,9 @@
-import { Plugin, TFile, MarkdownView, Editor } from 'obsidian';
+import { Plugin, TFile, MarkdownView, Editor, Notice } from 'obsidian';
 import { SmartAttachmentsSettings, DEFAULT_SETTINGS } from './settings';
 import { SmartAttachmentsSettingTab } from './settings-tab';
 import { PasteHandler } from './handlers/paste-handler';
 import { DropHandler } from './handlers/drop-handler';
+import { CleanupUtils, CleanupConfirmModal, CleanupResultModal } from './utils/cleanup-utils';
 
 export default class SmartAttachmentsPlugin extends Plugin {
     settings: SmartAttachmentsSettings;
@@ -29,6 +30,15 @@ export default class SmartAttachmentsPlugin extends Plugin {
                 this.handleDrop(evt, editor, view);
             })
         );
+
+        // Add command for cleaning up orphaned attachments
+        this.addCommand({
+            id: 'cleanup-orphaned-attachments',
+            name: '清理孤立附件',
+            callback: () => {
+                this.cleanupOrphanedAttachments();
+            }
+        });
 
         // Add settings tab
         this.addSettingTab(new SmartAttachmentsSettingTab(this.app, this));
@@ -93,5 +103,62 @@ export default class SmartAttachmentsPlugin extends Plugin {
             return;
         }
         // Let default handler process if not handled
+    }
+
+    /**
+     * Clean up orphaned attachment files
+     */
+    async cleanupOrphanedAttachments(): Promise<void> {
+        const cleanupUtils = new CleanupUtils(this.app.vault, this.settings);
+
+        new Notice('正在扫描孤立附件...', 3000);
+
+        try {
+            const result = await cleanupUtils.scanOrphanedFiles();
+
+            if (result.orphanedFiles.length === 0) {
+                new Notice('没有发现孤立附件！', 3000);
+                return;
+            }
+
+            // Show confirmation modal
+            if (this.settings.showCleanupConfirmation) {
+                new CleanupConfirmModal(
+                    this.app,
+                    result.orphanedFiles,
+                    result.totalSize,
+                    async () => {
+                        // User confirmed, delete files
+                        const deleteResult = await cleanupUtils.deleteOrphanedFiles(result.orphanedFiles);
+
+                        new CleanupResultModal(this.app, {
+                            ...result,
+                            deletedCount: deleteResult.deletedCount,
+                            deletedSize: deleteResult.deletedSize
+                        }).open();
+
+                        if (deleteResult.deletedCount > 0) {
+                            new Notice(
+                                `已清理 ${deleteResult.deletedCount} 个孤立附件，释放 ${CleanupUtils.formatFileSize(deleteResult.deletedSize)}`,
+                                5000
+                            );
+                        }
+                    }
+                ).open();
+            } else {
+                // Auto delete without confirmation
+                const deleteResult = await cleanupUtils.deleteOrphanedFiles(result.orphanedFiles);
+
+                if (deleteResult.deletedCount > 0) {
+                    new Notice(
+                        `已自动清理 ${deleteResult.deletedCount} 个孤立附件，释放 ${CleanupUtils.formatFileSize(deleteResult.deletedSize)}`,
+                        5000
+                    );
+                }
+            }
+        } catch (error) {
+            console.error('Error cleaning up orphaned attachments:', error);
+            new Notice('清理失败: ' + (error as Error).message, 5000);
+        }
     }
 }
