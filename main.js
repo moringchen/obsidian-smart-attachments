@@ -106,7 +106,7 @@ var SmartAttachmentsSettingTab = class extends import_obsidian.PluginSettingTab 
   display() {
     const { containerEl } = this;
     containerEl.empty();
-    containerEl.createEl("h2", { text: "Smart Attachments Settings" });
+    new import_obsidian.Setting(containerEl).setName("Smart Attachments settings").setHeading();
     new import_obsidian.Setting(containerEl).setName("Resource folder name").setDesc("The name of the folder where attachments will be stored (will be created as sibling to your vault)").addText((text) => text.setPlaceholder("resources").setValue(this.plugin.settings.resourceFolderName).onChange(async (value) => {
       this.plugin.settings.resourceFolderName = value || "resources";
       await this.plugin.saveSettings();
@@ -119,7 +119,7 @@ var SmartAttachmentsSettingTab = class extends import_obsidian.PluginSettingTab 
       this.plugin.settings.autoRenameDuplicates = value;
       await this.plugin.saveSettings();
     }));
-    containerEl.createEl("h3", { text: "Cleanup" });
+    new import_obsidian.Setting(containerEl).setName("Cleanup").setHeading();
     new import_obsidian.Setting(containerEl).setName("Show cleanup confirmation").setDesc("Show a confirmation dialog before deleting orphaned attachments").addToggle((toggle) => toggle.setValue(this.plugin.settings.showCleanupConfirmation).onChange(async (value) => {
       this.plugin.settings.showCleanupConfirmation = value;
       await this.plugin.saveSettings();
@@ -127,7 +127,7 @@ var SmartAttachmentsSettingTab = class extends import_obsidian.PluginSettingTab 
     new import_obsidian.Setting(containerEl).setName("Clean up orphaned attachments").setDesc("Scan and delete attachment files that are not referenced in any markdown file").addButton((button) => button.setButtonText("Clean up now").setCta().onClick(() => {
       this.plugin.cleanupOrphanedAttachments();
     }));
-    containerEl.createEl("h3", { text: "How it works" });
+    new import_obsidian.Setting(containerEl).setName("How it works").setHeading();
     const infoDiv = containerEl.createDiv();
     infoDiv.createEl("p", {
       text: "When you paste or drop files into a markdown note, they will be organized in the following structure:"
@@ -741,10 +741,10 @@ var SmartAttachmentsPlugin = class extends import_obsidian6.Plugin {
       }
     });
     this.addSettingTab(new SmartAttachmentsSettingTab(this.app, this));
-    console.log("Smart Attachments plugin loaded");
+    console.debug("Smart Attachments plugin loaded");
   }
   onunload() {
-    console.log("Smart Attachments plugin unloaded");
+    console.debug("Smart Attachments plugin unloaded");
   }
   async loadSettings() {
     this.settings = Object.assign({}, DEFAULT_SETTINGS, await this.loadData());
@@ -827,9 +827,9 @@ var SmartAttachmentsPlugin = class extends import_obsidian6.Plugin {
           );
         }
       }
-    } catch (error) {
-      console.error("Error cleaning up orphaned attachments:", error);
-      new import_obsidian6.Notice("\u6E05\u7406\u5931\u8D25: " + error.message, 5e3);
+    } catch (err) {
+      console.error("Error cleaning up orphaned attachments:", err);
+      new import_obsidian6.Notice("\u6E05\u7406\u5931\u8D25: " + err.message, 5e3);
     }
   }
 };

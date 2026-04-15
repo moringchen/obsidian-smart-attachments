@@ -1,4 +1,4 @@
-import { Plugin, TFile, MarkdownView, Editor, Notice } from 'obsidian';
+import { Plugin, MarkdownView, Editor, Notice } from 'obsidian';
 import { SmartAttachmentsSettings, DEFAULT_SETTINGS } from './settings';
 import { SmartAttachmentsSettingTab } from './settings-tab';
 import { PasteHandler } from './handlers/paste-handler';
@@ -43,11 +43,11 @@ export default class SmartAttachmentsPlugin extends Plugin {
         // Add settings tab
         this.addSettingTab(new SmartAttachmentsSettingTab(this.app, this));
 
-        console.log('Smart Attachments plugin loaded');
+        console.debug('Smart Attachments plugin loaded');
     }
 
     onunload() {
-        console.log('Smart Attachments plugin unloaded');
+        console.debug('Smart Attachments plugin unloaded');
     }
 
     async loadSettings() {
@@ -156,9 +156,9 @@ export default class SmartAttachmentsPlugin extends Plugin {
                     );
                 }
             }
-        } catch (error) {
-            console.error('Error cleaning up orphaned attachments:', error);
-            new Notice('清理失败: ' + (error as Error).message, 5000);
+        } catch (err) {
+            console.error('Error cleaning up orphaned attachments:', err);
+            new Notice('清理失败: ' + (err as Error).message, 5000);
         }
     }
 }

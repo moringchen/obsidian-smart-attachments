@@ -15,7 +15,9 @@ export class SmartAttachmentsSettingTab extends PluginSettingTab {
 
         containerEl.empty();
 
-        containerEl.createEl('h2', { text: 'Smart Attachments Settings' });
+        new Setting(containerEl)
+            .setName('Smart Attachments settings')
+            .setHeading();
 
         // Resource folder name setting
         new Setting(containerEl)
@@ -54,7 +56,9 @@ export class SmartAttachmentsSettingTab extends PluginSettingTab {
                 }));
 
         // Cleanup section
-        containerEl.createEl('h3', { text: 'Cleanup' });
+        new Setting(containerEl)
+            .setName('Cleanup')
+            .setHeading();
 
         // Show cleanup confirmation setting
         new Setting(containerEl)
@@ -79,7 +83,9 @@ export class SmartAttachmentsSettingTab extends PluginSettingTab {
                 }));
 
         // Information section
-        containerEl.createEl('h3', { text: 'How it works' });
+        new Setting(containerEl)
+            .setName('How it works')
+            .setHeading();
 
         const infoDiv = containerEl.createDiv();
         infoDiv.createEl('p', {
