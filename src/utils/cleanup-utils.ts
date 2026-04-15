@@ -82,8 +82,8 @@ export class CleanupUtils {
                 await this.vault.adapter.remove(file.path);
                 deletedCount++;
                 deletedSize += file.size;
-            } catch (error) {
-                console.error(`Failed to delete ${file.path}:`, error);
+            } catch {
+                console.error(`Failed to delete ${file.path}`);
             }
         }
 
@@ -100,8 +100,8 @@ export class CleanupUtils {
 
         try {
             await this.collectFilesRecursive(resourceDir, resourceFiles);
-        } catch (error) {
-            console.log('Resource directory not found or empty:', error);
+        } catch {
+            console.debug('Resource directory not found or empty');
         }
 
         return resourceFiles;
@@ -123,7 +123,7 @@ export class CleanupUtils {
             for (const folder of list.folders) {
                 await this.collectFilesRecursive(folder, files);
             }
-        } catch (error) {
+        } catch {
             // Directory might not exist
         }
     }
@@ -217,17 +217,10 @@ export class CleanupConfirmModal extends Modal {
         });
 
         // Create file list
-        const listContainer = contentEl.createDiv();
-        listContainer.style.maxHeight = '300px';
-        listContainer.style.overflow = 'auto';
-        listContainer.style.border = '1px solid var(--background-modifier-border)';
-        listContainer.style.padding = '10px';
-        listContainer.style.marginBottom = '20px';
+        const listContainer = contentEl.createDiv({ cls: 'smart-attachments-file-list' });
 
         for (const file of this.orphanedFiles) {
-            const item = listContainer.createDiv();
-            item.style.marginBottom = '5px';
-            item.style.fontSize = '12px';
+            const item = listContainer.createDiv({ cls: 'smart-attachments-file-item' });
             item.createSpan({
                 text: `${file.name} (${CleanupUtils.formatFileSize(file.size)})`,
                 cls: 'cleanup-file-item'
@@ -241,11 +234,7 @@ export class CleanupConfirmModal extends Modal {
         });
 
         // Buttons
-        const buttonContainer = contentEl.createDiv();
-        buttonContainer.style.display = 'flex';
-        buttonContainer.style.justifyContent = 'flex-end';
-        buttonContainer.style.gap = '10px';
-        buttonContainer.style.marginTop = '20px';
+        const buttonContainer = contentEl.createDiv({ cls: 'smart-attachments-button-container' });
 
         const cancelButton = buttonContainer.createEl('button', { text: '取消' });
         cancelButton.addEventListener('click', () => {
@@ -254,9 +243,8 @@ export class CleanupConfirmModal extends Modal {
 
         const confirmButton = buttonContainer.createEl('button', {
             text: `删除 ${this.orphanedFiles.length} 个文件`,
-            cls: 'mod-warning'
+            cls: 'mod-warning smart-attachments-error-button'
         });
-        confirmButton.style.backgroundColor = 'var(--background-modifier-error)';
         confirmButton.addEventListener('click', () => {
             this.result = true;
             this.onConfirm();
@@ -294,8 +282,7 @@ export class CleanupResultModal extends Modal {
             });
         }
 
-        const okButton = contentEl.createEl('button', { text: '确定', cls: 'mod-cta' });
-        okButton.style.marginTop = '20px';
+        const okButton = contentEl.createEl('button', { text: '确定', cls: 'mod-cta smart-attachments-margin-top' });
         okButton.addEventListener('click', () => {
             this.close();
         });

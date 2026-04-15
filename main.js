@@ -106,7 +106,7 @@ var SmartAttachmentsSettingTab = class extends import_obsidian.PluginSettingTab 
   display() {
     const { containerEl } = this;
     containerEl.empty();
-    new import_obsidian.Setting(containerEl).setName("Smart Attachments settings").setHeading();
+    new import_obsidian.Setting(containerEl).setName("General").setHeading();
     new import_obsidian.Setting(containerEl).setName("Resource folder name").setDesc("The name of the folder where attachments will be stored (will be created as sibling to your vault)").addText((text) => text.setPlaceholder("resources").setValue(this.plugin.settings.resourceFolderName).onChange(async (value) => {
       this.plugin.settings.resourceFolderName = value || "resources";
       await this.plugin.saveSettings();
@@ -540,8 +540,8 @@ var CleanupUtils = class {
         await this.vault.adapter.remove(file.path);
         deletedCount++;
         deletedSize += file.size;
-      } catch (error) {
-        console.error(`Failed to delete ${file.path}:`, error);
+      } catch (e) {
+        console.error(`Failed to delete ${file.path}`);
       }
     }
     return { deletedCount, deletedSize };
@@ -555,8 +555,8 @@ var CleanupUtils = class {
     const resourceDir = `${vaultRoot}/../${this.settings.resourceFolderName}`;
     try {
       await this.collectFilesRecursive(resourceDir, resourceFiles);
-    } catch (error) {
-      console.log("Resource directory not found or empty:", error);
+    } catch (e) {
+      console.debug("Resource directory not found or empty");
     }
     return resourceFiles;
   }
@@ -572,7 +572,7 @@ var CleanupUtils = class {
       for (const folder of list.folders) {
         await this.collectFilesRecursive(folder, files);
       }
-    } catch (error) {
+    } catch (e) {
     }
   }
   /**
@@ -646,16 +646,9 @@ var CleanupConfirmModal = class extends import_obsidian5.Modal {
     contentEl.createEl("p", {
       text: `\u53D1\u73B0 ${this.orphanedFiles.length} \u4E2A\u672A\u88AB\u5F15\u7528\u7684\u9644\u4EF6\u6587\u4EF6\uFF0C\u5360\u7528\u7A7A\u95F4 ${CleanupUtils.formatFileSize(this.totalSize)}\u3002`
     });
-    const listContainer = contentEl.createDiv();
-    listContainer.style.maxHeight = "300px";
-    listContainer.style.overflow = "auto";
-    listContainer.style.border = "1px solid var(--background-modifier-border)";
-    listContainer.style.padding = "10px";
-    listContainer.style.marginBottom = "20px";
+    const listContainer = contentEl.createDiv({ cls: "smart-attachments-file-list" });
     for (const file of this.orphanedFiles) {
-      const item = listContainer.createDiv();
-      item.style.marginBottom = "5px";
-      item.style.fontSize = "12px";
+      const item = listContainer.createDiv({ cls: "smart-attachments-file-item" });
       item.createSpan({
         text: `${file.name} (${CleanupUtils.formatFileSize(file.size)})`,
         cls: "cleanup-file-item"
@@ -665,20 +658,15 @@ var CleanupConfirmModal = class extends import_obsidian5.Modal {
       text: "\u26A0\uFE0F \u8FD9\u4E9B\u6587\u4EF6\u5728\u60A8\u7684\u7B14\u8BB0\u4E2D\u672A\u88AB\u5F15\u7528\u3002\u5220\u9664\u540E\u5C06\u65E0\u6CD5\u6062\u590D\u3002",
       cls: "cleanup-warning"
     });
-    const buttonContainer = contentEl.createDiv();
-    buttonContainer.style.display = "flex";
-    buttonContainer.style.justifyContent = "flex-end";
-    buttonContainer.style.gap = "10px";
-    buttonContainer.style.marginTop = "20px";
+    const buttonContainer = contentEl.createDiv({ cls: "smart-attachments-button-container" });
     const cancelButton = buttonContainer.createEl("button", { text: "\u53D6\u6D88" });
     cancelButton.addEventListener("click", () => {
       this.close();
     });
     const confirmButton = buttonContainer.createEl("button", {
       text: `\u5220\u9664 ${this.orphanedFiles.length} \u4E2A\u6587\u4EF6`,
-      cls: "mod-warning"
+      cls: "mod-warning smart-attachments-error-button"
     });
-    confirmButton.style.backgroundColor = "var(--background-modifier-error)";
     confirmButton.addEventListener("click", () => {
       this.result = true;
       this.onConfirm();
@@ -705,8 +693,7 @@ var CleanupResultModal = class extends import_obsidian5.Modal {
         text: `\u6210\u529F\u5220\u9664 ${this.result.deletedCount} \u4E2A\u6587\u4EF6\uFF0C\u91CA\u653E ${CleanupUtils.formatFileSize(this.result.deletedSize)} \u7A7A\u95F4\u3002`
       });
     }
-    const okButton = contentEl.createEl("button", { text: "\u786E\u5B9A", cls: "mod-cta" });
-    okButton.style.marginTop = "20px";
+    const okButton = contentEl.createEl("button", { text: "\u786E\u5B9A", cls: "mod-cta smart-attachments-margin-top" });
     okButton.addEventListener("click", () => {
       this.close();
     });
@@ -725,12 +712,12 @@ var SmartAttachmentsPlugin = class extends import_obsidian6.Plugin {
     this.dropHandler = new DropHandler(this.app.vault, this.settings);
     this.registerEvent(
       this.app.workspace.on("editor-paste", (evt, editor, view) => {
-        this.handlePaste(evt, editor, view);
+        void this.handlePaste(evt, editor, view);
       })
     );
     this.registerEvent(
       this.app.workspace.on("editor-drop", (evt, editor, view) => {
-        this.handleDrop(evt, editor, view);
+        void this.handleDrop(evt, editor, view);
       })
     );
     this.addCommand({

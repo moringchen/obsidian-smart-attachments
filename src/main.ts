@@ -20,14 +20,14 @@ export default class SmartAttachmentsPlugin extends Plugin {
         // Register paste event handler
         this.registerEvent(
             this.app.workspace.on('editor-paste', (evt: ClipboardEvent, editor: Editor, view: MarkdownView) => {
-                this.handlePaste(evt, editor, view);
+                void this.handlePaste(evt, editor, view);
             })
         );
 
         // Register drop event handler
         this.registerEvent(
             this.app.workspace.on('editor-drop', (evt: DragEvent, editor: Editor, view: MarkdownView) => {
-                this.handleDrop(evt, editor, view);
+                void this.handleDrop(evt, editor, view);
             })
         );
 

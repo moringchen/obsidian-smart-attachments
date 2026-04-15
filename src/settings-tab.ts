@@ -16,7 +16,7 @@ export class SmartAttachmentsSettingTab extends PluginSettingTab {
         containerEl.empty();
 
         new Setting(containerEl)
-            .setName('Smart Attachments settings')
+            .setName('General')
             .setHeading();
 
         // Resource folder name setting
