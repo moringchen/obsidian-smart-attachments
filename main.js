@@ -106,7 +106,7 @@ var SmartAttachmentsSettingTab = class extends import_obsidian.PluginSettingTab 
   display() {
     const { containerEl } = this;
     containerEl.empty();
-    new import_obsidian.Setting(containerEl).setName("Resource folder name").setDesc("The name of the folder where attachments will be stored (will be created as sibling to your vault)").addText((text) => text.setPlaceholder("resources").setValue(this.plugin.settings.resourceFolderName).onChange((value) => {
+    new import_obsidian.Setting(containerEl).setName("Resource folder name").setDesc("The name of the folder where attachments will be stored (will be created as sibling to your vault)").addText((text) => text.setPlaceholder("Resources").setValue(this.plugin.settings.resourceFolderName).onChange((value) => {
       this.plugin.settings.resourceFolderName = value || "resources";
       void this.plugin.saveSettings();
     }));
