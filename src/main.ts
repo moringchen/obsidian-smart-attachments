@@ -3,7 +3,7 @@ import { SmartAttachmentsSettings, DEFAULT_SETTINGS } from './settings';
 import { SmartAttachmentsSettingTab } from './settings-tab';
 import { PasteHandler } from './handlers/paste-handler';
 import { DropHandler } from './handlers/drop-handler';
-import { CleanupUtils, CleanupConfirmModal, CleanupResultModal } from './utils/cleanup-utils';
+import { CleanupUtils, CleanupConfirmModal, CleanupResultModal, CleanupResult } from './utils/cleanup-utils';
 
 export default class SmartAttachmentsPlugin extends Plugin {
     settings: SmartAttachmentsSettings;
@@ -36,7 +36,7 @@ export default class SmartAttachmentsPlugin extends Plugin {
             id: 'cleanup-orphaned-attachments',
             name: '清理孤立附件',
             callback: () => {
-                this.cleanupOrphanedAttachments();
+                void this.cleanupOrphanedAttachments();
             }
         });
 
@@ -121,44 +121,42 @@ export default class SmartAttachmentsPlugin extends Plugin {
                 return;
             }
 
-            // Show confirmation modal
             if (this.settings.showCleanupConfirmation) {
                 new CleanupConfirmModal(
                     this.app,
                     result.orphanedFiles,
                     result.totalSize,
-                    async () => {
-                        // User confirmed, delete files
-                        const deleteResult = await cleanupUtils.deleteOrphanedFiles(result.orphanedFiles);
-
-                        new CleanupResultModal(this.app, {
-                            ...result,
-                            deletedCount: deleteResult.deletedCount,
-                            deletedSize: deleteResult.deletedSize
-                        }).open();
-
-                        if (deleteResult.deletedCount > 0) {
-                            new Notice(
-                                `已清理 ${deleteResult.deletedCount} 个孤立附件，释放 ${CleanupUtils.formatFileSize(deleteResult.deletedSize)}`,
-                                5000
-                            );
-                        }
+                    () => {
+                        void this.finishCleanup(cleanupUtils, result);
                     }
                 ).open();
-            } else {
-                // Auto delete without confirmation
-                const deleteResult = await cleanupUtils.deleteOrphanedFiles(result.orphanedFiles);
-
-                if (deleteResult.deletedCount > 0) {
-                    new Notice(
-                        `已自动清理 ${deleteResult.deletedCount} 个孤立附件，释放 ${CleanupUtils.formatFileSize(deleteResult.deletedSize)}`,
-                        5000
-                    );
-                }
+                return;
             }
+
+            await this.finishCleanup(cleanupUtils, result);
         } catch (err) {
             console.error('Error cleaning up orphaned attachments:', err);
             new Notice('清理失败: ' + (err as Error).message, 5000);
+        }
+    }
+
+    private async finishCleanup(cleanupUtils: CleanupUtils, result: CleanupResult): Promise<void> {
+        const deleteResult = await cleanupUtils.deleteOrphanedFiles(result.orphanedFiles);
+
+        if (this.settings.showCleanupConfirmation) {
+            new CleanupResultModal(this.app, {
+                ...result,
+                deletedCount: deleteResult.deletedCount,
+                deletedSize: deleteResult.deletedSize
+            }).open();
+        }
+
+        if (deleteResult.deletedCount > 0) {
+            const message = this.settings.showCleanupConfirmation
+                ? `已清理 ${deleteResult.deletedCount} 个孤立附件，释放 ${CleanupUtils.formatFileSize(deleteResult.deletedSize)}`
+                : `已自动清理 ${deleteResult.deletedCount} 个孤立附件，释放 ${CleanupUtils.formatFileSize(deleteResult.deletedSize)}`;
+
+            new Notice(message, 5000);
         }
     }
 }

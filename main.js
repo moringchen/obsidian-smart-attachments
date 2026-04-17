@@ -106,26 +106,25 @@ var SmartAttachmentsSettingTab = class extends import_obsidian.PluginSettingTab 
   display() {
     const { containerEl } = this;
     containerEl.empty();
-    new import_obsidian.Setting(containerEl).setName("General").setHeading();
-    new import_obsidian.Setting(containerEl).setName("Resource folder name").setDesc("The name of the folder where attachments will be stored (will be created as sibling to your vault)").addText((text) => text.setPlaceholder("resources").setValue(this.plugin.settings.resourceFolderName).onChange(async (value) => {
+    new import_obsidian.Setting(containerEl).setName("Resource folder name").setDesc("The name of the folder where attachments will be stored (will be created as sibling to your vault)").addText((text) => text.setPlaceholder("resources").setValue(this.plugin.settings.resourceFolderName).onChange((value) => {
       this.plugin.settings.resourceFolderName = value || "resources";
-      await this.plugin.saveSettings();
+      void this.plugin.saveSettings();
     }));
-    new import_obsidian.Setting(containerEl).setName("Link format").setDesc("How links to attachments should be formatted in your notes").addDropdown((dropdown) => dropdown.addOption("wikilink" /* WIKILINK */, "WikiLinks (![[path/to/file.png]])").addOption("markdown" /* MARKDOWN */, "Markdown (![alt](path/to/file.png))").setValue(this.plugin.settings.linkFormat).onChange(async (value) => {
+    new import_obsidian.Setting(containerEl).setName("Link format").setDesc("How links to attachments should be formatted in your notes").addDropdown((dropdown) => dropdown.addOption("wikilink" /* WIKILINK */, "Wiki links (![[path/to/file.png]])").addOption("markdown" /* MARKDOWN */, "Markdown links (![alt](path/to/file.png))").setValue(this.plugin.settings.linkFormat).onChange((value) => {
       this.plugin.settings.linkFormat = value;
-      await this.plugin.saveSettings();
+      void this.plugin.saveSettings();
     }));
-    new import_obsidian.Setting(containerEl).setName("Auto-rename duplicates").setDesc("When a file with the same name exists, automatically rename it (e.g., image.png \u2192 image-1.png)").addToggle((toggle) => toggle.setValue(this.plugin.settings.autoRenameDuplicates).onChange(async (value) => {
+    new import_obsidian.Setting(containerEl).setName("Auto-rename duplicates").setDesc("When a file with the same name exists, automatically rename it (e.g., image.png \u2192 image-1.png)").addToggle((toggle) => toggle.setValue(this.plugin.settings.autoRenameDuplicates).onChange((value) => {
       this.plugin.settings.autoRenameDuplicates = value;
-      await this.plugin.saveSettings();
+      void this.plugin.saveSettings();
     }));
     new import_obsidian.Setting(containerEl).setName("Cleanup").setHeading();
-    new import_obsidian.Setting(containerEl).setName("Show cleanup confirmation").setDesc("Show a confirmation dialog before deleting orphaned attachments").addToggle((toggle) => toggle.setValue(this.plugin.settings.showCleanupConfirmation).onChange(async (value) => {
+    new import_obsidian.Setting(containerEl).setName("Show cleanup confirmation").setDesc("Show a confirmation dialog before deleting orphaned attachments").addToggle((toggle) => toggle.setValue(this.plugin.settings.showCleanupConfirmation).onChange((value) => {
       this.plugin.settings.showCleanupConfirmation = value;
-      await this.plugin.saveSettings();
+      void this.plugin.saveSettings();
     }));
     new import_obsidian.Setting(containerEl).setName("Clean up orphaned attachments").setDesc("Scan and delete attachment files that are not referenced in any markdown file").addButton((button) => button.setButtonText("Clean up now").setCta().onClick(() => {
-      this.plugin.cleanupOrphanedAttachments();
+      void this.plugin.cleanupOrphanedAttachments();
     }));
     new import_obsidian.Setting(containerEl).setName("How it works").setHeading();
     const infoDiv = containerEl.createDiv();
@@ -724,7 +723,7 @@ var SmartAttachmentsPlugin = class extends import_obsidian6.Plugin {
       id: "cleanup-orphaned-attachments",
       name: "\u6E05\u7406\u5B64\u7ACB\u9644\u4EF6",
       callback: () => {
-        this.cleanupOrphanedAttachments();
+        void this.cleanupOrphanedAttachments();
       }
     });
     this.addSettingTab(new SmartAttachmentsSettingTab(this.app, this));
@@ -790,33 +789,30 @@ var SmartAttachmentsPlugin = class extends import_obsidian6.Plugin {
           this.app,
           result.orphanedFiles,
           result.totalSize,
-          async () => {
-            const deleteResult = await cleanupUtils.deleteOrphanedFiles(result.orphanedFiles);
-            new CleanupResultModal(this.app, {
-              ...result,
-              deletedCount: deleteResult.deletedCount,
-              deletedSize: deleteResult.deletedSize
-            }).open();
-            if (deleteResult.deletedCount > 0) {
-              new import_obsidian6.Notice(
-                `\u5DF2\u6E05\u7406 ${deleteResult.deletedCount} \u4E2A\u5B64\u7ACB\u9644\u4EF6\uFF0C\u91CA\u653E ${CleanupUtils.formatFileSize(deleteResult.deletedSize)}`,
-                5e3
-              );
-            }
+          () => {
+            void this.finishCleanup(cleanupUtils, result);
           }
         ).open();
-      } else {
-        const deleteResult = await cleanupUtils.deleteOrphanedFiles(result.orphanedFiles);
-        if (deleteResult.deletedCount > 0) {
-          new import_obsidian6.Notice(
-            `\u5DF2\u81EA\u52A8\u6E05\u7406 ${deleteResult.deletedCount} \u4E2A\u5B64\u7ACB\u9644\u4EF6\uFF0C\u91CA\u653E ${CleanupUtils.formatFileSize(deleteResult.deletedSize)}`,
-            5e3
-          );
-        }
+        return;
       }
+      await this.finishCleanup(cleanupUtils, result);
     } catch (err) {
       console.error("Error cleaning up orphaned attachments:", err);
       new import_obsidian6.Notice("\u6E05\u7406\u5931\u8D25: " + err.message, 5e3);
+    }
+  }
+  async finishCleanup(cleanupUtils, result) {
+    const deleteResult = await cleanupUtils.deleteOrphanedFiles(result.orphanedFiles);
+    if (this.settings.showCleanupConfirmation) {
+      new CleanupResultModal(this.app, {
+        ...result,
+        deletedCount: deleteResult.deletedCount,
+        deletedSize: deleteResult.deletedSize
+      }).open();
+    }
+    if (deleteResult.deletedCount > 0) {
+      const message = this.settings.showCleanupConfirmation ? `\u5DF2\u6E05\u7406 ${deleteResult.deletedCount} \u4E2A\u5B64\u7ACB\u9644\u4EF6\uFF0C\u91CA\u653E ${CleanupUtils.formatFileSize(deleteResult.deletedSize)}` : `\u5DF2\u81EA\u52A8\u6E05\u7406 ${deleteResult.deletedCount} \u4E2A\u5B64\u7ACB\u9644\u4EF6\uFF0C\u91CA\u653E ${CleanupUtils.formatFileSize(deleteResult.deletedSize)}`;
+      new import_obsidian6.Notice(message, 5e3);
     }
   }
 };

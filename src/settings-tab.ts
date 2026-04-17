@@ -15,10 +15,6 @@ export class SmartAttachmentsSettingTab extends PluginSettingTab {
 
         containerEl.empty();
 
-        new Setting(containerEl)
-            .setName('General')
-            .setHeading();
-
         // Resource folder name setting
         new Setting(containerEl)
             .setName('Resource folder name')
@@ -26,9 +22,9 @@ export class SmartAttachmentsSettingTab extends PluginSettingTab {
             .addText(text => text
                 .setPlaceholder('resources')
                 .setValue(this.plugin.settings.resourceFolderName)
-                .onChange(async (value) => {
+                .onChange((value) => {
                     this.plugin.settings.resourceFolderName = value || 'resources';
-                    await this.plugin.saveSettings();
+                    void this.plugin.saveSettings();
                 }));
 
         // Link format setting
@@ -36,12 +32,12 @@ export class SmartAttachmentsSettingTab extends PluginSettingTab {
             .setName('Link format')
             .setDesc('How links to attachments should be formatted in your notes')
             .addDropdown(dropdown => dropdown
-                .addOption(LinkFormat.WIKILINK, 'WikiLinks (![[path/to/file.png]])')
-                .addOption(LinkFormat.MARKDOWN, 'Markdown (![alt](path/to/file.png))')
+                .addOption(LinkFormat.WIKILINK, 'Wiki links (![[path/to/file.png]])')
+                .addOption(LinkFormat.MARKDOWN, 'Markdown links (![alt](path/to/file.png))')
                 .setValue(this.plugin.settings.linkFormat)
-                .onChange(async (value) => {
+                .onChange((value) => {
                     this.plugin.settings.linkFormat = value as LinkFormat;
-                    await this.plugin.saveSettings();
+                    void this.plugin.saveSettings();
                 }));
 
         // Auto rename duplicates setting
@@ -50,9 +46,9 @@ export class SmartAttachmentsSettingTab extends PluginSettingTab {
             .setDesc('When a file with the same name exists, automatically rename it (e.g., image.png → image-1.png)')
             .addToggle(toggle => toggle
                 .setValue(this.plugin.settings.autoRenameDuplicates)
-                .onChange(async (value) => {
+                .onChange((value) => {
                     this.plugin.settings.autoRenameDuplicates = value;
-                    await this.plugin.saveSettings();
+                    void this.plugin.saveSettings();
                 }));
 
         // Cleanup section
@@ -66,9 +62,9 @@ export class SmartAttachmentsSettingTab extends PluginSettingTab {
             .setDesc('Show a confirmation dialog before deleting orphaned attachments')
             .addToggle(toggle => toggle
                 .setValue(this.plugin.settings.showCleanupConfirmation)
-                .onChange(async (value) => {
+                .onChange((value) => {
                     this.plugin.settings.showCleanupConfirmation = value;
-                    await this.plugin.saveSettings();
+                    void this.plugin.saveSettings();
                 }));
 
         // Manual cleanup button
@@ -79,7 +75,7 @@ export class SmartAttachmentsSettingTab extends PluginSettingTab {
                 .setButtonText('Clean up now')
                 .setCta()
                 .onClick(() => {
-                    this.plugin.cleanupOrphanedAttachments();
+                    void this.plugin.cleanupOrphanedAttachments();
                 }));
 
         // Information section
