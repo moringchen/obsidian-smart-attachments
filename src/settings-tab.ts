@@ -70,7 +70,7 @@ export class SmartAttachmentsSettingTab extends PluginSettingTab {
         // Manual cleanup button
         new Setting(containerEl)
             .setName('Clean up orphaned attachments')
-            .setDesc('Scan and delete attachment files that are not referenced in any markdown file')
+            .setDesc('Scan and delete attachment files that are not referenced in any Markdown file')
             .addButton(button => button
                 .setButtonText('Clean up now')
                 .setCta()
@@ -85,7 +85,7 @@ export class SmartAttachmentsSettingTab extends PluginSettingTab {
 
         const infoDiv = containerEl.createDiv();
         infoDiv.createEl('p', {
-            text: 'When you paste or drop files into a markdown note, they will be organized in the following structure:'
+            text: 'When you paste or drop files into a Markdown note, they will be organized in the following structure:'
         });
 
         const codeBlock = infoDiv.createEl('pre');

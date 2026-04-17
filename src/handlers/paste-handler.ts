@@ -1,7 +1,7 @@
 import { Editor, Notice, TFile, Vault } from 'obsidian';
 import { PathUtils } from '../utils/path-utils';
 import { LinkUtils } from '../utils/link-utils';
-import { SmartAttachmentsSettings, LinkFormat } from '../types';
+import { SmartAttachmentsSettings } from '../types';
 
 export class PasteHandler {
     constructor(
@@ -19,8 +19,7 @@ export class PasteHandler {
             return false;
         }
 
-        // Filter for supported file types
-        const supportedFiles = Array.from(files).filter(file => this.isSupportedFile(file));
+        const supportedFiles = Array.from(files);
         if (supportedFiles.length === 0) {
             return false;
         }
@@ -39,14 +38,6 @@ export class PasteHandler {
             new Notice(`Error processing files: ${(error as Error).message}`, 5000);
             return true;
         }
-    }
-
-    /**
-     * Check if file type is supported
-     */
-    private isSupportedFile(file: File): boolean {
-        // Accept all files - we'll organize them by type
-        return true;
     }
 
     /**
@@ -139,7 +130,7 @@ export class PasteHandler {
                 return parts[parts.length - 1];
             }));
             return PathUtils.generateUniqueFileName(fileName, existingFiles);
-        } catch (error) {
+        } catch {
             // If directory doesn't exist yet, no duplicates possible
             return fileName;
         }

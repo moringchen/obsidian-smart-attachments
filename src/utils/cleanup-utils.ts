@@ -1,4 +1,4 @@
-import { Vault, TFile, Notice, Modal, App, FileSystemAdapter } from 'obsidian';
+import { Vault, TFile, Modal, App, FileSystemAdapter } from 'obsidian';
 import { SmartAttachmentsSettings } from '../types';
 
 /**

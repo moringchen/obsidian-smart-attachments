@@ -30,7 +30,7 @@ export class DropHandler {
 
         try {
             for (const file of droppedFiles) {
-                await this.processFile(file, editor, mdFile, evt);
+                await this.processFile(file, editor, mdFile);
             }
             new Notice(`Successfully processed ${droppedFiles.length} file(s)`);
             return true;
@@ -44,7 +44,7 @@ export class DropHandler {
     /**
      * Process a single file: save to resources and insert link
      */
-    private async processFile(file: File, editor: Editor, mdFile: TFile, evt?: DragEvent): Promise<void> {
+    private async processFile(file: File, editor: Editor, mdFile: TFile): Promise<void> {
         const extension = PathUtils.getFileExtension(file.name);
         const sanitizedName = PathUtils.sanitizeFileName(file.name);
 
@@ -133,7 +133,7 @@ export class DropHandler {
                 return parts[parts.length - 1];
             }));
             return PathUtils.generateUniqueFileName(fileName, existingFiles);
-        } catch (error) {
+        } catch {
             // If directory doesn't exist yet, no duplicates possible
             return fileName;
         }

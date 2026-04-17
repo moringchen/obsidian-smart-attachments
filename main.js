@@ -123,13 +123,13 @@ var SmartAttachmentsSettingTab = class extends import_obsidian.PluginSettingTab 
       this.plugin.settings.showCleanupConfirmation = value;
       void this.plugin.saveSettings();
     }));
-    new import_obsidian.Setting(containerEl).setName("Clean up orphaned attachments").setDesc("Scan and delete attachment files that are not referenced in any markdown file").addButton((button) => button.setButtonText("Clean up now").setCta().onClick(() => {
+    new import_obsidian.Setting(containerEl).setName("Clean up orphaned attachments").setDesc("Scan and delete attachment files that are not referenced in any Markdown file").addButton((button) => button.setButtonText("Clean up now").setCta().onClick(() => {
       void this.plugin.cleanupOrphanedAttachments();
     }));
     new import_obsidian.Setting(containerEl).setName("How it works").setHeading();
     const infoDiv = containerEl.createDiv();
     infoDiv.createEl("p", {
-      text: "When you paste or drop files into a markdown note, they will be organized in the following structure:"
+      text: "When you paste or drop files into a Markdown note, they will be organized in the following structure:"
     });
     const codeBlock = infoDiv.createEl("pre");
     codeBlock.createEl("code", {
@@ -287,7 +287,7 @@ var PasteHandler = class {
     if (!files || files.length === 0) {
       return false;
     }
-    const supportedFiles = Array.from(files).filter((file) => this.isSupportedFile(file));
+    const supportedFiles = Array.from(files);
     if (supportedFiles.length === 0) {
       return false;
     }
@@ -304,12 +304,6 @@ var PasteHandler = class {
       new import_obsidian3.Notice(`Error processing files: ${error.message}`, 5e3);
       return true;
     }
-  }
-  /**
-   * Check if file type is supported
-   */
-  isSupportedFile(file) {
-    return true;
   }
   /**
    * Process a single file: save to resources and insert link
@@ -378,7 +372,7 @@ var PasteHandler = class {
         return parts[parts.length - 1];
       }));
       return PathUtils.generateUniqueFileName(fileName, existingFiles);
-    } catch (error) {
+    } catch (e) {
       return fileName;
     }
   }
@@ -409,7 +403,7 @@ var DropHandler = class {
     evt.stopPropagation();
     try {
       for (const file of droppedFiles) {
-        await this.processFile(file, editor, mdFile, evt);
+        await this.processFile(file, editor, mdFile);
       }
       new import_obsidian4.Notice(`Successfully processed ${droppedFiles.length} file(s)`);
       return true;
@@ -422,7 +416,7 @@ var DropHandler = class {
   /**
    * Process a single file: save to resources and insert link
    */
-  async processFile(file, editor, mdFile, evt) {
+  async processFile(file, editor, mdFile) {
     const extension = PathUtils.getFileExtension(file.name);
     const sanitizedName = PathUtils.sanitizeFileName(file.name);
     const resourceDir = PathUtils.buildResourcePath(
@@ -486,7 +480,7 @@ var DropHandler = class {
         return parts[parts.length - 1];
       }));
       return PathUtils.generateUniqueFileName(fileName, existingFiles);
-    } catch (error) {
+    } catch (e) {
       return fileName;
     }
   }
