@@ -13,7 +13,7 @@ export class DropHandler {
      * Handle drop event
      * Returns true if handled, false to let default handler process
      */
-    async handle(evt: DragEvent, editor: Editor, mdFile: TFile): Promise<boolean> {
+    async handle(evt: DragEvent, editor: Editor, noteFile: TFile): Promise<boolean> {
         const files = evt.dataTransfer?.files;
         if (!files || files.length === 0) {
             return false;
@@ -30,7 +30,7 @@ export class DropHandler {
 
         try {
             for (const file of droppedFiles) {
-                await this.processFile(file, editor, mdFile);
+                await this.processFile(file, editor, noteFile);
             }
             new Notice(`Successfully processed ${droppedFiles.length} file(s)`);
             return true;
@@ -44,20 +44,20 @@ export class DropHandler {
     /**
      * Process a single file: save to resources and insert link
      */
-    private async processFile(file: File, editor: Editor, mdFile: TFile): Promise<void> {
+    private async processFile(file: File, editor: Editor, noteFile: TFile): Promise<void> {
         const extension = PathUtils.getFileExtension(file.name);
         const sanitizedName = PathUtils.sanitizeFileName(file.name);
 
         // Build resource paths
         const resourceDir = PathUtils.buildResourcePath(
             this.vault,
-            mdFile,
+            noteFile,
             extension,
             this.settings.resourceFolderName
         );
 
         const resourceLinkPath = PathUtils.buildResourceLinkPath(
-            mdFile,
+            noteFile,
             extension,
             this.settings.resourceFolderName
         );

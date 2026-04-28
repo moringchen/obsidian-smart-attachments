@@ -14,6 +14,8 @@ Automatically organize your attachments into a structured resources folder that 
 - **Duplicate Handling**: Automatically renames duplicates (e.g., `image.png` → `image-1.png`)
 - **Flexible Linking**: Choose between WikiLinks or standard Markdown link formats
 - **External Resources**: Attachments are stored outside your vault (as sibling to vault root)
+- **Move Sync**: Directory moves and renames keep managed resource directories aligned
+- **Extensionless Notes**: Files without a suffix are treated like Markdown notes for paste/drop and move sync
 
 ## How It Works
 
@@ -38,6 +40,8 @@ The resulting markdown link:
 ```markdown
 ![[resources/images/notes/projects/pasted-image.png]]
 ```
+
+When a managed note directory is moved or renamed, the plugin also moves the corresponding resource directories and rewrites managed `resources/...` links inside affected notes. When a single managed note is moved to a new directory, resources are either moved with it or copied for that note depending on whether the source directory still contains other managed notes.
 
 ## Installation
 

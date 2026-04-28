@@ -1,5 +1,6 @@
 import { Vault, TFile, Modal, App, FileSystemAdapter } from 'obsidian';
 import { SmartAttachmentsSettings } from '../types';
+import { extractManagedResourceLinks } from './managed-link-utils';
 
 /**
  * Information about an orphaned file
@@ -137,22 +138,9 @@ export class CleanupUtils {
         for (const mdFile of markdownFiles) {
             const content = await this.vault.cachedRead(mdFile);
 
-            // Match WikiLinks: ![[resources/...]] or [[resources/...]]
-            const wikiLinkRegex = /!?\[\[(resources\/[^\]]+)\]\]/g;
-            let match;
-            while ((match = wikiLinkRegex.exec(content)) !== null) {
-                const resourcePath = match[1];
-                const fullPath = this.resolveResourcePath(resourcePath);
-                if (fullPath) {
-                    referencedFiles.add(fullPath);
-                }
-            }
-
-            // Match Markdown links: ![](resources/...) or [alt](resources/...)
-            const markdownLinkRegex = /!?\[[^\]]*\]\((resources\/[^)]+)\)/g;
-            while ((match = markdownLinkRegex.exec(content)) !== null) {
-                const resourcePath = match[1];
-                const fullPath = this.resolveResourcePath(resourcePath);
+            const links = extractManagedResourceLinks(content);
+            for (const link of links) {
+                const fullPath = this.resolveResourcePath(link.resourcePath);
                 if (fullPath) {
                     referencedFiles.add(fullPath);
                 }

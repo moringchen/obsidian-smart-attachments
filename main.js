@@ -24,10 +24,20 @@ var __toCommonJS = (mod) => __copyProps(__defProp({}, "__esModule", { value: tru
 // src/main.ts
 var main_exports = {};
 __export(main_exports, {
-  default: () => SmartAttachmentsPlugin
+  createDirectoryMovePlan: () => createDirectoryMovePlan,
+  createNoteMovePlan: () => createNoteMovePlan,
+  default: () => SmartAttachmentsPlugin,
+  extractManagedResourceLinks: () => extractManagedResourceLinks,
+  formatResourceSyncSummary: () => formatResourceSyncSummary,
+  getManagedResourceDirPrefixes: () => getManagedResourceDirPrefixes,
+  isManagedNoteLikePath: () => isManagedNoteLikePath,
+  listManagedResourcePaths: () => listManagedResourcePaths,
+  mapManagedResourceDir: () => mapManagedResourceDir,
+  rewriteDirectoryMoveContent: () => rewriteDirectoryMoveContent,
+  rewriteManagedResourcePrefix: () => rewriteManagedResourcePrefix
 });
 module.exports = __toCommonJS(main_exports);
-var import_obsidian6 = require("obsidian");
+var import_obsidian5 = require("obsidian");
 
 // src/types.ts
 var DEFAULT_SETTINGS = {
@@ -152,10 +162,10 @@ resources/                    (sibling to vault)
 };
 
 // src/handlers/paste-handler.ts
-var import_obsidian3 = require("obsidian");
+var import_obsidian2 = require("obsidian");
 
 // src/utils/path-utils.ts
-var import_obsidian2 = require("obsidian");
+var MANAGED_RESOURCE_TYPES = ["images", "audio", "videos", "documents", "archives", "code", "files"];
 var PathUtils = class {
   /**
    * Get the file extension from a filename
@@ -183,10 +193,10 @@ var PathUtils = class {
    * Returns: {vault-parent}/resources/{file-type}/{md-relative-path}/
    */
   static buildResourcePath(vault, mdFile, fileExtension, resourceFolderName) {
-    const vaultRoot = this.getVaultRoot(vault);
+    const resourceRoot = this.getResourceRoot(vault, resourceFolderName);
     const subFolder = this.getSubFolderByType(fileExtension);
     const relativePath = this.getRelativePathFromVault(mdFile);
-    const parts = [vaultRoot, "..", resourceFolderName, subFolder];
+    const parts = [resourceRoot, subFolder];
     if (relativePath) {
       parts.push(relativePath);
     }
@@ -196,10 +206,21 @@ var PathUtils = class {
    * Get vault root path using FileSystemAdapter
    */
   static getVaultRoot(vault) {
-    if (vault.adapter instanceof import_obsidian2.FileSystemAdapter) {
-      return vault.adapter.getBasePath();
+    const adapter = vault.adapter;
+    if (typeof adapter.getBasePath === "function") {
+      return adapter.getBasePath();
     }
     return vault.getName();
+  }
+  static getResourceRoot(vault, resourceFolderName) {
+    const vaultRoot = this.getVaultRoot(vault);
+    const absoluteResourceRoot = `${vaultRoot}/../${resourceFolderName}`;
+    return vaultRoot.includes(`/${resourceFolderName}`) ? vaultRoot : absoluteResourceRoot;
+  }
+  static resolveManagedResourcePath(vault, resourceFolderName, resourcePath) {
+    const vaultRoot = this.getVaultRoot(vault);
+    const resourceRelativePath = resourcePath.replace(/^resources\//, `${resourceFolderName}/`);
+    return vaultRoot.includes(`/${resourceFolderName}`) ? `${vaultRoot}/${resourceRelativePath}` : `${vaultRoot}/../${resourceRelativePath}`;
   }
   /**
    * Build the relative resource path for linking in markdown
@@ -238,6 +259,17 @@ var PathUtils = class {
    */
   static sanitizeFileName(fileName) {
     return fileName.replace(/[<>:"/\\|?*]/g, "_").trim();
+  }
+  static getManagedResourceTypes() {
+    return MANAGED_RESOURCE_TYPES;
+  }
+  static getManagedResourceDirPrefixes(relativeDir) {
+    return MANAGED_RESOURCE_TYPES.map((type) => `resources/${type}${relativeDir ? `/${relativeDir}` : ""}`);
+  }
+  static mapManagedResourceDir(resourceDir, oldDir, newDir) {
+    const oldSuffix = oldDir ? `/${oldDir}` : "";
+    const newSuffix = newDir ? `/${newDir}` : "";
+    return resourceDir.endsWith(oldSuffix) ? `${resourceDir.slice(0, resourceDir.length - oldSuffix.length)}${newSuffix}` : resourceDir;
   }
 };
 
@@ -281,7 +313,7 @@ var PasteHandler = class {
    * Handle paste event
    * Returns true if handled, false to let default handler process
    */
-  async handle(evt, editor, mdFile) {
+  async handle(evt, editor, noteFile) {
     var _a;
     const files = (_a = evt.clipboardData) == null ? void 0 : _a.files;
     if (!files || files.length === 0) {
@@ -295,30 +327,30 @@ var PasteHandler = class {
     evt.stopPropagation();
     try {
       for (const file of supportedFiles) {
-        await this.processFile(file, editor, mdFile);
+        await this.processFile(file, editor, noteFile);
       }
-      new import_obsidian3.Notice(`Successfully processed ${supportedFiles.length} file(s)`);
+      new import_obsidian2.Notice(`Successfully processed ${supportedFiles.length} file(s)`);
       return true;
     } catch (error) {
       console.error("Error processing pasted files:", error);
-      new import_obsidian3.Notice(`Error processing files: ${error.message}`, 5e3);
+      new import_obsidian2.Notice(`Error processing files: ${error.message}`, 5e3);
       return true;
     }
   }
   /**
    * Process a single file: save to resources and insert link
    */
-  async processFile(file, editor, mdFile) {
+  async processFile(file, editor, noteFile) {
     const extension = PathUtils.getFileExtension(file.name);
     const sanitizedName = PathUtils.sanitizeFileName(file.name);
     const resourceDir = PathUtils.buildResourcePath(
       this.vault,
-      mdFile,
+      noteFile,
       extension,
       this.settings.resourceFolderName
     );
     const resourceLinkPath = PathUtils.buildResourceLinkPath(
-      mdFile,
+      noteFile,
       extension,
       this.settings.resourceFolderName
     );
@@ -379,7 +411,7 @@ var PasteHandler = class {
 };
 
 // src/handlers/drop-handler.ts
-var import_obsidian4 = require("obsidian");
+var import_obsidian3 = require("obsidian");
 var DropHandler = class {
   constructor(vault, settings) {
     this.vault = vault;
@@ -389,7 +421,7 @@ var DropHandler = class {
    * Handle drop event
    * Returns true if handled, false to let default handler process
    */
-  async handle(evt, editor, mdFile) {
+  async handle(evt, editor, noteFile) {
     var _a;
     const files = (_a = evt.dataTransfer) == null ? void 0 : _a.files;
     if (!files || files.length === 0) {
@@ -403,30 +435,30 @@ var DropHandler = class {
     evt.stopPropagation();
     try {
       for (const file of droppedFiles) {
-        await this.processFile(file, editor, mdFile);
+        await this.processFile(file, editor, noteFile);
       }
-      new import_obsidian4.Notice(`Successfully processed ${droppedFiles.length} file(s)`);
+      new import_obsidian3.Notice(`Successfully processed ${droppedFiles.length} file(s)`);
       return true;
     } catch (error) {
       console.error("Error processing dropped files:", error);
-      new import_obsidian4.Notice(`Error processing files: ${error.message}`, 5e3);
+      new import_obsidian3.Notice(`Error processing files: ${error.message}`, 5e3);
       return true;
     }
   }
   /**
    * Process a single file: save to resources and insert link
    */
-  async processFile(file, editor, mdFile) {
+  async processFile(file, editor, noteFile) {
     const extension = PathUtils.getFileExtension(file.name);
     const sanitizedName = PathUtils.sanitizeFileName(file.name);
     const resourceDir = PathUtils.buildResourcePath(
       this.vault,
-      mdFile,
+      noteFile,
       extension,
       this.settings.resourceFolderName
     );
     const resourceLinkPath = PathUtils.buildResourceLinkPath(
-      mdFile,
+      noteFile,
       extension,
       this.settings.resourceFolderName
     );
@@ -487,7 +519,46 @@ var DropHandler = class {
 };
 
 // src/utils/cleanup-utils.ts
-var import_obsidian5 = require("obsidian");
+var import_obsidian4 = require("obsidian");
+
+// src/utils/managed-link-utils.ts
+var WIKI_LINK_REGEX = /!?(\[\[(resources\/[^\]]+)\]\])/g;
+var MARKDOWN_LINK_REGEX = /!?(\[[^\]]*\]\((resources\/[^)]+)\))/g;
+function extractManagedResourceLinks(content) {
+  const matches = [];
+  for (const regex of [WIKI_LINK_REGEX, MARKDOWN_LINK_REGEX]) {
+    regex.lastIndex = 0;
+    let match;
+    while ((match = regex.exec(content)) !== null) {
+      matches.push({
+        fullMatch: match[1],
+        resourcePath: match[2]
+      });
+    }
+  }
+  return matches;
+}
+function listManagedResourcePaths(content) {
+  return extractManagedResourceLinks(content).map((link) => link.resourcePath);
+}
+function rewriteManagedResourcePrefix(content, oldDir, newDir) {
+  const resourceTypes = ["images", "audio", "videos", "documents", "archives", "code", "files"];
+  let updatedCount = 0;
+  let nextContent = content;
+  for (const type of resourceTypes) {
+    const from = `resources/${type}${oldDir ? `/${oldDir}` : ""}`;
+    const to = `resources/${type}${newDir ? `/${newDir}` : ""}`;
+    if (!nextContent.includes(from)) {
+      continue;
+    }
+    const occurrences = nextContent.split(from).length - 1;
+    nextContent = nextContent.split(from).join(to);
+    updatedCount += occurrences;
+  }
+  return { content: nextContent, updatedCount };
+}
+
+// src/utils/cleanup-utils.ts
 var CleanupUtils = class {
   constructor(vault, settings) {
     this.vault = vault;
@@ -575,19 +646,9 @@ var CleanupUtils = class {
     const referencedFiles = /* @__PURE__ */ new Set();
     for (const mdFile of markdownFiles) {
       const content = await this.vault.cachedRead(mdFile);
-      const wikiLinkRegex = /!?\[\[(resources\/[^\]]+)\]\]/g;
-      let match;
-      while ((match = wikiLinkRegex.exec(content)) !== null) {
-        const resourcePath = match[1];
-        const fullPath = this.resolveResourcePath(resourcePath);
-        if (fullPath) {
-          referencedFiles.add(fullPath);
-        }
-      }
-      const markdownLinkRegex = /!?\[[^\]]*\]\((resources\/[^)]+)\)/g;
-      while ((match = markdownLinkRegex.exec(content)) !== null) {
-        const resourcePath = match[1];
-        const fullPath = this.resolveResourcePath(resourcePath);
+      const links = extractManagedResourceLinks(content);
+      for (const link of links) {
+        const fullPath = this.resolveResourcePath(link.resourcePath);
         if (fullPath) {
           referencedFiles.add(fullPath);
         }
@@ -599,7 +660,7 @@ var CleanupUtils = class {
    * Get vault root path
    */
   getVaultRoot() {
-    if (this.vault.adapter instanceof import_obsidian5.FileSystemAdapter) {
+    if (this.vault.adapter instanceof import_obsidian4.FileSystemAdapter) {
       return this.vault.adapter.getBasePath();
     }
     return "";
@@ -625,7 +686,7 @@ var CleanupUtils = class {
     return `${(bytes / (1024 * 1024 * 1024)).toFixed(1)} GB`;
   }
 };
-var CleanupConfirmModal = class extends import_obsidian5.Modal {
+var CleanupConfirmModal = class extends import_obsidian4.Modal {
   constructor(app, orphanedFiles, totalSize, onConfirm) {
     super(app);
     this.orphanedFiles = orphanedFiles;
@@ -671,7 +732,7 @@ var CleanupConfirmModal = class extends import_obsidian5.Modal {
     contentEl.empty();
   }
 };
-var CleanupResultModal = class extends import_obsidian5.Modal {
+var CleanupResultModal = class extends import_obsidian4.Modal {
   constructor(app, result) {
     super(app);
     this.result = result;
@@ -697,8 +758,197 @@ var CleanupResultModal = class extends import_obsidian5.Modal {
   }
 };
 
+// src/utils/managed-note-utils.ts
+function isManagedNoteLikePath(path) {
+  const lastSlash = path.lastIndexOf("/");
+  const fileName = lastSlash === -1 ? path : path.slice(lastSlash + 1);
+  const lastDot = fileName.lastIndexOf(".");
+  if (lastDot === -1) {
+    return fileName.length > 0;
+  }
+  return fileName.slice(lastDot + 1).toLowerCase() === "md";
+}
+function isManagedNoteFile(file) {
+  return isManagedNoteLikePath(file.path);
+}
+function countSiblingManagedNotes(paths, currentPath) {
+  const currentDir = currentPath.includes("/") ? currentPath.slice(0, currentPath.lastIndexOf("/")) : "";
+  return paths.filter((path) => {
+    if (path === currentPath || !isManagedNoteLikePath(path)) {
+      return false;
+    }
+    const dir = path.includes("/") ? path.slice(0, path.lastIndexOf("/")) : "";
+    return dir === currentDir;
+  }).length;
+}
+
+// src/utils/resource-sync-utils.ts
+function createEmptyResourceSyncSummary() {
+  return {
+    movedDirectories: [],
+    copiedFiles: [],
+    updatedLinks: 0,
+    missingResources: [],
+    failedTargets: []
+  };
+}
+function formatResourceSyncSummary(summary) {
+  const parts = [];
+  if (summary.movedDirectories.length > 0) {
+    parts.push(`\u5DF2\u79FB\u52A8 ${summary.movedDirectories.length} \u4E2A\u8D44\u6E90\u76EE\u5F55`);
+  }
+  if (summary.copiedFiles.length > 0) {
+    parts.push(`\u5DF2\u590D\u5236 ${summary.copiedFiles.length} \u4E2A\u8D44\u6E90`);
+  }
+  if (summary.updatedLinks > 0) {
+    parts.push(`\u5DF2\u66F4\u65B0 ${summary.updatedLinks} \u4E2A\u94FE\u63A5`);
+  }
+  if (summary.missingResources.length > 0) {
+    parts.push(`${summary.missingResources.length} \u4E2A\u8D44\u6E90\u7F3A\u5931`);
+  }
+  if (summary.failedTargets.length > 0) {
+    parts.push(`${summary.failedTargets.length} \u4E2A\u76EE\u6807\u5904\u7406\u5931\u8D25`);
+  }
+  return parts.join("\uFF0C");
+}
+
+// src/services/directory-move-sync.ts
+function createDirectoryMovePlan(input) {
+  const wantedDirs = new Set(PathUtils.getManagedResourceDirPrefixes(input.oldDir));
+  const directoryMoves = input.availableResourceDirs.filter((dir) => wantedDirs.has(dir)).map((dir) => ({
+    from: dir,
+    to: PathUtils.mapManagedResourceDir(dir, input.oldDir, input.newDir)
+  }));
+  return {
+    directoryMoves,
+    filesToRewrite: input.managedFiles
+  };
+}
+function rewriteDirectoryMoveContent(content, oldDir, newDir) {
+  return rewriteManagedResourcePrefix(content, oldDir, newDir);
+}
+async function syncMovedDirectory(vault, oldDir, newDir, resourceFolderName) {
+  const summary = createEmptyResourceSyncSummary();
+  const managedFiles = vault.getFiles().filter((file) => isManagedNoteFile(file) && file.path.startsWith(`${newDir}/`));
+  const availableResourceDirs = PathUtils.getManagedResourceDirPrefixes(oldDir).map((dir) => ({ logical: dir, actual: PathUtils.resolveManagedResourcePath(vault, resourceFolderName, dir) }));
+  for (const candidate of availableResourceDirs) {
+    if (!await vault.adapter.exists(candidate.actual)) {
+      continue;
+    }
+    const targetLogical = PathUtils.mapManagedResourceDir(candidate.logical, oldDir, newDir);
+    const targetActual = PathUtils.resolveManagedResourcePath(vault, resourceFolderName, targetLogical);
+    await vault.adapter.rename(candidate.actual, targetActual);
+    summary.movedDirectories.push({ from: candidate.logical, to: targetLogical });
+  }
+  for (const file of managedFiles) {
+    const content = await vault.cachedRead(file);
+    const rewrite = rewriteDirectoryMoveContent(content, oldDir, newDir);
+    if (rewrite.updatedCount === 0) {
+      continue;
+    }
+    await vault.modify(file, rewrite.content);
+    summary.updatedLinks += rewrite.updatedCount;
+  }
+  return summary;
+}
+
+// src/services/note-move-sync.ts
+function createNoteMovePlan(input) {
+  if (input.siblingManagedNoteCount === 0) {
+    return {
+      mode: "move-directory",
+      copyOperations: []
+    };
+  }
+  return {
+    mode: "copy-links",
+    copyOperations: input.currentFileLinks.map((link) => {
+      const firstSlash = link.indexOf("/", "resources/".length);
+      const resourceTypePrefix = firstSlash === -1 ? link : link.slice(0, firstSlash);
+      const resourceRelativePath = firstSlash === -1 ? "" : link.slice(firstSlash);
+      const oldDirSuffix = input.oldDir ? `/${input.oldDir}` : "";
+      return {
+        from: link,
+        to: resourceRelativePath.startsWith(`${oldDirSuffix}/`) ? `${resourceTypePrefix}/${input.newDir}${resourceRelativePath.slice(oldDirSuffix.length)}` : link
+      };
+    })
+  };
+}
+async function ensureDirectoryExists(vault, dirPath) {
+  if (await vault.adapter.exists(dirPath)) {
+    return;
+  }
+  await vault.adapter.mkdir(dirPath);
+}
+async function moveDirectory(vault, fromDir, toDir) {
+  if (!await vault.adapter.exists(toDir)) {
+    await ensureDirectoryExists(vault, toDir.slice(0, toDir.lastIndexOf("/")));
+    await vault.adapter.rename(fromDir, toDir);
+    return;
+  }
+  const entries = await vault.adapter.list(fromDir);
+  for (const file of entries.files) {
+    const target = `${toDir}/${file.slice(file.lastIndexOf("/") + 1)}`;
+    await vault.adapter.rename(file, target);
+  }
+  for (const folder of entries.folders) {
+    const target = `${toDir}/${folder.slice(folder.lastIndexOf("/") + 1)}`;
+    await moveDirectory(vault, folder, target);
+  }
+  await vault.adapter.rmdir(fromDir, false);
+}
+async function syncMovedManagedNote(vault, file, oldPath, resourceFolderName) {
+  const summary = createEmptyResourceSyncSummary();
+  const oldDir = oldPath.includes("/") ? oldPath.slice(0, oldPath.lastIndexOf("/")) : "";
+  const newDir = file.path.includes("/") ? file.path.slice(0, file.path.lastIndexOf("/")) : "";
+  const siblingManagedNoteCount = countSiblingManagedNotes(vault.getFiles().map((item) => item.path), oldPath);
+  const content = await vault.cachedRead(file);
+  const currentFileLinks = listManagedResourcePaths(content);
+  const plan = createNoteMovePlan({ oldDir, newDir, currentFileLinks, siblingManagedNoteCount });
+  if (plan.mode === "move-directory") {
+    for (const resourceDir of PathUtils.getManagedResourceDirPrefixes(oldDir)) {
+      const from = PathUtils.resolveManagedResourcePath(vault, resourceFolderName, resourceDir);
+      if (!await vault.adapter.exists(from)) {
+        continue;
+      }
+      const targetLogical = PathUtils.mapManagedResourceDir(resourceDir, oldDir, newDir);
+      const to = PathUtils.resolveManagedResourcePath(vault, resourceFolderName, targetLogical);
+      await moveDirectory(vault, from, to);
+      summary.movedDirectories.push({ from: resourceDir, to: targetLogical });
+    }
+    const rewrite = rewriteManagedResourcePrefix(content, oldDir, newDir);
+    if (rewrite.updatedCount > 0) {
+      await vault.modify(file, rewrite.content);
+      summary.updatedLinks += rewrite.updatedCount;
+    }
+    return summary;
+  }
+  let nextContent = content;
+  for (const operation of plan.copyOperations) {
+    const from = PathUtils.resolveManagedResourcePath(vault, resourceFolderName, operation.from);
+    const to = PathUtils.resolveManagedResourcePath(vault, resourceFolderName, operation.to);
+    if (!await vault.adapter.exists(from)) {
+      summary.missingResources.push(operation.from);
+      continue;
+    }
+    const parent = to.slice(0, to.lastIndexOf("/"));
+    await ensureDirectoryExists(vault, parent);
+    const bytes = await vault.adapter.readBinary(from);
+    await vault.adapter.writeBinary(to, bytes);
+    summary.copiedFiles.push(operation);
+    nextContent = nextContent.split(operation.from).join(operation.to);
+    summary.updatedLinks += 1;
+  }
+  if (summary.updatedLinks > 0) {
+    await vault.modify(file, nextContent);
+  }
+  return summary;
+}
+
 // src/main.ts
-var SmartAttachmentsPlugin = class extends import_obsidian6.Plugin {
+var getManagedResourceDirPrefixes = PathUtils.getManagedResourceDirPrefixes;
+var mapManagedResourceDir = PathUtils.mapManagedResourceDir;
+var SmartAttachmentsPlugin = class extends import_obsidian5.Plugin {
   async onload() {
     await this.loadSettings();
     this.pasteHandler = new PasteHandler(this.app.vault, this.settings);
@@ -711,6 +961,11 @@ var SmartAttachmentsPlugin = class extends import_obsidian6.Plugin {
     this.registerEvent(
       this.app.workspace.on("editor-drop", (evt, editor, view) => {
         void this.handleDrop(evt, editor, view);
+      })
+    );
+    this.registerEvent(
+      this.app.vault.on("rename", (file, oldPath) => {
+        void this.handleVaultRename(file, oldPath);
       })
     );
     this.addCommand({
@@ -738,14 +993,14 @@ var SmartAttachmentsPlugin = class extends import_obsidian6.Plugin {
    * Handle paste event
    */
   async handlePaste(evt, editor, view) {
-    const mdFile = view.file;
-    if (!mdFile) {
+    const noteFile = view.file;
+    if (!noteFile) {
       return;
     }
-    if (mdFile.extension !== "md") {
+    if (!isManagedNoteFile(noteFile)) {
       return;
     }
-    const handled = await this.pasteHandler.handle(evt, editor, mdFile);
+    const handled = await this.pasteHandler.handle(evt, editor, noteFile);
     if (handled) {
       return;
     }
@@ -754,16 +1009,36 @@ var SmartAttachmentsPlugin = class extends import_obsidian6.Plugin {
    * Handle drop event
    */
   async handleDrop(evt, editor, view) {
-    const mdFile = view.file;
-    if (!mdFile) {
+    const noteFile = view.file;
+    if (!noteFile) {
       return;
     }
-    if (mdFile.extension !== "md") {
+    if (!isManagedNoteFile(noteFile)) {
       return;
     }
-    const handled = await this.dropHandler.handle(evt, editor, mdFile);
+    const handled = await this.dropHandler.handle(evt, editor, noteFile);
     if (handled) {
       return;
+    }
+  }
+  async handleVaultRename(file, oldPath) {
+    if (file instanceof import_obsidian5.TFolder) {
+      const result = await syncMovedDirectory(this.app.vault, oldPath, file.path, this.settings.resourceFolderName);
+      if (result.movedDirectories.length > 0 || result.updatedLinks > 0) {
+        new import_obsidian5.Notice(formatResourceSyncSummary(result), 5e3);
+      }
+      return;
+    }
+    if (file instanceof import_obsidian5.TFile && isManagedNoteFile(file)) {
+      const oldDir = oldPath.includes("/") ? oldPath.slice(0, oldPath.lastIndexOf("/")) : "";
+      const newDir = file.path.includes("/") ? file.path.slice(0, file.path.lastIndexOf("/")) : "";
+      if (oldDir === newDir) {
+        return;
+      }
+      const result = await syncMovedManagedNote(this.app.vault, file, oldPath, this.settings.resourceFolderName);
+      if (result.movedDirectories.length > 0 || result.copiedFiles.length > 0 || result.updatedLinks > 0 || result.missingResources.length > 0) {
+        new import_obsidian5.Notice(formatResourceSyncSummary(result), 5e3);
+      }
     }
   }
   /**
@@ -771,11 +1046,11 @@ var SmartAttachmentsPlugin = class extends import_obsidian6.Plugin {
    */
   async cleanupOrphanedAttachments() {
     const cleanupUtils = new CleanupUtils(this.app.vault, this.settings);
-    new import_obsidian6.Notice("\u6B63\u5728\u626B\u63CF\u5B64\u7ACB\u9644\u4EF6...", 3e3);
+    new import_obsidian5.Notice("\u6B63\u5728\u626B\u63CF\u5B64\u7ACB\u9644\u4EF6...", 3e3);
     try {
       const result = await cleanupUtils.scanOrphanedFiles();
       if (result.orphanedFiles.length === 0) {
-        new import_obsidian6.Notice("\u6CA1\u6709\u53D1\u73B0\u5B64\u7ACB\u9644\u4EF6\uFF01", 3e3);
+        new import_obsidian5.Notice("\u6CA1\u6709\u53D1\u73B0\u5B64\u7ACB\u9644\u4EF6\uFF01", 3e3);
         return;
       }
       if (this.settings.showCleanupConfirmation) {
@@ -792,7 +1067,7 @@ var SmartAttachmentsPlugin = class extends import_obsidian6.Plugin {
       await this.finishCleanup(cleanupUtils, result);
     } catch (err) {
       console.error("Error cleaning up orphaned attachments:", err);
-      new import_obsidian6.Notice("\u6E05\u7406\u5931\u8D25: " + err.message, 5e3);
+      new import_obsidian5.Notice("\u6E05\u7406\u5931\u8D25: " + err.message, 5e3);
     }
   }
   async finishCleanup(cleanupUtils, result) {
@@ -806,7 +1081,7 @@ var SmartAttachmentsPlugin = class extends import_obsidian6.Plugin {
     }
     if (deleteResult.deletedCount > 0) {
       const message = this.settings.showCleanupConfirmation ? `\u5DF2\u6E05\u7406 ${deleteResult.deletedCount} \u4E2A\u5B64\u7ACB\u9644\u4EF6\uFF0C\u91CA\u653E ${CleanupUtils.formatFileSize(deleteResult.deletedSize)}` : `\u5DF2\u81EA\u52A8\u6E05\u7406 ${deleteResult.deletedCount} \u4E2A\u5B64\u7ACB\u9644\u4EF6\uFF0C\u91CA\u653E ${CleanupUtils.formatFileSize(deleteResult.deletedSize)}`;
-      new import_obsidian6.Notice(message, 5e3);
+      new import_obsidian5.Notice(message, 5e3);
     }
   }
 };

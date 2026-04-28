@@ -1,5 +1,7 @@
-import { TFile, Vault, FileSystemAdapter } from 'obsidian';
+import type { TFile, Vault } from 'obsidian';
 import { FILE_TYPE_MAP } from '../types';
+
+const MANAGED_RESOURCE_TYPES = ['images', 'audio', 'videos', 'documents', 'archives', 'code', 'files'] as const;
 
 export class PathUtils {
     /**
@@ -36,13 +38,11 @@ export class PathUtils {
         fileExtension: string,
         resourceFolderName: string
     ): string {
-        // Get vault root
-        const vaultRoot = this.getVaultRoot(vault);
+        const resourceRoot = this.getResourceRoot(vault, resourceFolderName);
         const subFolder = this.getSubFolderByType(fileExtension);
         const relativePath = this.getRelativePathFromVault(mdFile);
 
-        // Build path: vault-parent/resources/file-type/relative-path
-        const parts = [vaultRoot, '..', resourceFolderName, subFolder];
+        const parts = [resourceRoot, subFolder];
         if (relativePath) {
             parts.push(relativePath);
         }
@@ -53,16 +53,27 @@ export class PathUtils {
     /**
      * Get vault root path using FileSystemAdapter
      */
-    private static getVaultRoot(vault: Vault): string {
-        // Check if we're on desktop with FileSystemAdapter
-        if (vault.adapter instanceof FileSystemAdapter) {
-            return vault.adapter.getBasePath();
+    static getVaultRoot(vault: Vault): string {
+        const adapter = vault.adapter as { getBasePath?: () => string };
+        if (typeof adapter.getBasePath === 'function') {
+            return adapter.getBasePath();
         }
 
-        // Mobile fallback: use vault name to construct path
-        // On mobile, we can't access the file system directly
-        // so we'll store resources inside the vault
         return vault.getName();
+    }
+
+    static getResourceRoot(vault: Vault, resourceFolderName: string): string {
+        const vaultRoot = this.getVaultRoot(vault);
+        const absoluteResourceRoot = `${vaultRoot}/../${resourceFolderName}`;
+        return vaultRoot.includes(`/${resourceFolderName}`) ? vaultRoot : absoluteResourceRoot;
+    }
+
+    static resolveManagedResourcePath(vault: Vault, resourceFolderName: string, resourcePath: string): string {
+        const vaultRoot = this.getVaultRoot(vault);
+        const resourceRelativePath = resourcePath.replace(/^resources\//, `${resourceFolderName}/`);
+        return vaultRoot.includes(`/${resourceFolderName}`)
+            ? `${vaultRoot}/${resourceRelativePath}`
+            : `${vaultRoot}/../${resourceRelativePath}`;
     }
 
     /**
@@ -118,5 +129,21 @@ export class PathUtils {
     static sanitizeFileName(fileName: string): string {
         // Replace invalid characters with underscore
         return fileName.replace(/[<>:"/\\|?*]/g, '_').trim();
+    }
+
+    static getManagedResourceTypes(): readonly string[] {
+        return MANAGED_RESOURCE_TYPES;
+    }
+
+    static getManagedResourceDirPrefixes(relativeDir: string): string[] {
+        return MANAGED_RESOURCE_TYPES.map(type => `resources/${type}${relativeDir ? `/${relativeDir}` : ''}`);
+    }
+
+    static mapManagedResourceDir(resourceDir: string, oldDir: string, newDir: string): string {
+        const oldSuffix = oldDir ? `/${oldDir}` : '';
+        const newSuffix = newDir ? `/${newDir}` : '';
+        return resourceDir.endsWith(oldSuffix)
+            ? `${resourceDir.slice(0, resourceDir.length - oldSuffix.length)}${newSuffix}`
+            : resourceDir;
     }
 }

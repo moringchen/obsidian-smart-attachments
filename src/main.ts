@@ -1,9 +1,26 @@
-import { Plugin, MarkdownView, Editor, Notice } from 'obsidian';
+import { Plugin, MarkdownView, Editor, Notice, TAbstractFile, TFile, TFolder } from 'obsidian';
 import { SmartAttachmentsSettings, DEFAULT_SETTINGS } from './settings';
 import { SmartAttachmentsSettingTab } from './settings-tab';
 import { PasteHandler } from './handlers/paste-handler';
 import { DropHandler } from './handlers/drop-handler';
 import { CleanupUtils, CleanupConfirmModal, CleanupResultModal, CleanupResult } from './utils/cleanup-utils';
+import { isManagedNoteFile, isManagedNoteLikePath } from './utils/managed-note-utils';
+import { PathUtils } from './utils/path-utils';
+import { syncMovedDirectory } from './services/directory-move-sync';
+import { syncMovedManagedNote } from './services/note-move-sync';
+import { formatResourceSyncSummary } from './utils/resource-sync-utils';
+
+export { isManagedNoteLikePath } from './utils/managed-note-utils';
+export {
+    extractManagedResourceLinks,
+    listManagedResourcePaths,
+    rewriteManagedResourcePrefix
+} from './utils/managed-link-utils';
+export const getManagedResourceDirPrefixes = PathUtils.getManagedResourceDirPrefixes;
+export const mapManagedResourceDir = PathUtils.mapManagedResourceDir;
+export { createDirectoryMovePlan, rewriteDirectoryMoveContent } from './services/directory-move-sync';
+export { createNoteMovePlan } from './services/note-move-sync';
+export { formatResourceSyncSummary } from './utils/resource-sync-utils';
 
 export default class SmartAttachmentsPlugin extends Plugin {
     settings: SmartAttachmentsSettings;
@@ -28,6 +45,12 @@ export default class SmartAttachmentsPlugin extends Plugin {
         this.registerEvent(
             this.app.workspace.on('editor-drop', (evt: DragEvent, editor: Editor, view: MarkdownView) => {
                 void this.handleDrop(evt, editor, view);
+            })
+        );
+
+        this.registerEvent(
+            this.app.vault.on('rename', (file: TAbstractFile, oldPath: string) => {
+                void this.handleVaultRename(file, oldPath);
             })
         );
 
@@ -65,17 +88,16 @@ export default class SmartAttachmentsPlugin extends Plugin {
      * Handle paste event
      */
     private async handlePaste(evt: ClipboardEvent, editor: Editor, view: MarkdownView): Promise<void> {
-        const mdFile = view.file;
-        if (!mdFile) {
+        const noteFile = view.file;
+        if (!noteFile) {
             return;
         }
 
-        // Only process markdown files
-        if (mdFile.extension !== 'md') {
+        if (!isManagedNoteFile(noteFile)) {
             return;
         }
 
-        const handled = await this.pasteHandler.handle(evt, editor, mdFile);
+        const handled = await this.pasteHandler.handle(evt, editor, noteFile);
         if (handled) {
             // Event was handled by our plugin
             return;
@@ -87,22 +109,44 @@ export default class SmartAttachmentsPlugin extends Plugin {
      * Handle drop event
      */
     private async handleDrop(evt: DragEvent, editor: Editor, view: MarkdownView): Promise<void> {
-        const mdFile = view.file;
-        if (!mdFile) {
+        const noteFile = view.file;
+        if (!noteFile) {
             return;
         }
 
-        // Only process markdown files
-        if (mdFile.extension !== 'md') {
+        if (!isManagedNoteFile(noteFile)) {
             return;
         }
 
-        const handled = await this.dropHandler.handle(evt, editor, mdFile);
+        const handled = await this.dropHandler.handle(evt, editor, noteFile);
         if (handled) {
             // Event was handled by our plugin
             return;
         }
         // Let default handler process if not handled
+    }
+
+    private async handleVaultRename(file: TAbstractFile, oldPath: string): Promise<void> {
+        if (file instanceof TFolder) {
+            const result = await syncMovedDirectory(this.app.vault, oldPath, file.path, this.settings.resourceFolderName);
+            if (result.movedDirectories.length > 0 || result.updatedLinks > 0) {
+                new Notice(formatResourceSyncSummary(result), 5000);
+            }
+            return;
+        }
+
+        if (file instanceof TFile && isManagedNoteFile(file)) {
+            const oldDir = oldPath.includes('/') ? oldPath.slice(0, oldPath.lastIndexOf('/')) : '';
+            const newDir = file.path.includes('/') ? file.path.slice(0, file.path.lastIndexOf('/')) : '';
+            if (oldDir === newDir) {
+                return;
+            }
+
+            const result = await syncMovedManagedNote(this.app.vault, file, oldPath, this.settings.resourceFolderName);
+            if (result.movedDirectories.length > 0 || result.copiedFiles.length > 0 || result.updatedLinks > 0 || result.missingResources.length > 0) {
+                new Notice(formatResourceSyncSummary(result), 5000);
+            }
+        }
     }
 
     /**
